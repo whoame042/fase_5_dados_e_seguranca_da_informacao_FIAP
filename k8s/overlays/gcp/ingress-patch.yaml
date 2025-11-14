@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vehicle-resale-api-ingress
+  namespace: vehicle-resale
+  annotations:
+    # GKE Ingress annotations
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "vehicle-resale-api-ip"
+    ingress.gcp.kubernetes.io/pre-shared-cert: "vehicle-resale-api-cert"
+    cloud.google.com/backend-config: '{"default": "vehicle-resale-backend-config"}'
+    # Optional: For managed SSL
+    # networking.gke.io/managed-certificates: "vehicle-resale-api-cert"
+spec:
+  rules:
+  - host: vehicle-resale-api.example.com
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: vehicle-resale-api-service
+            port:
+              number: 80
+

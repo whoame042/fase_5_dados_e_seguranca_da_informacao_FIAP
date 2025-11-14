@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vehicle-resale-api
+  namespace: vehicle-resale
+  labels:
+    app: vehicle-resale-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vehicle-resale-api
+  template:
+    metadata:
+      labels:
+        app: vehicle-resale-api
+    spec:
+      containers:
+      - name: vehicle-resale-api
+        image: vehicle-resale-api:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: QUARKUS_HTTP_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_HTTP_PORT
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: DB_URL
+        - name: DB_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vehicle-resale-secret
+              key: DB_PASSWORD
+        - name: QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION
+        - name: QUARKUS_HIBERNATE_ORM_LOG_SQL
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_HIBERNATE_ORM_LOG_SQL
+        - name: QUARKUS_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_LOG_LEVEL
+        - name: QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+

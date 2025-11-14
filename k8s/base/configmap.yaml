@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vehicle-resale-config
+  namespace: vehicle-resale
+  labels:
+    app: vehicle-resale-api
+data:
+  # Configuracoes da aplicacao
+  QUARKUS_HTTP_PORT: "8081"
+  
+  # Configuracoes do banco de dados
+  DB_URL: "jdbc:postgresql://postgres-service:5432/vehicle_resale"
+  DB_USERNAME: "postgres"
+  
+  # Configuracoes do Hibernate
+  QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION: "update"
+  QUARKUS_HIBERNATE_ORM_LOG_SQL: "true"
+  
+  # Configuracoes de logging
+  QUARKUS_LOG_LEVEL: "INFO"
+  QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL: "DEBUG"
+

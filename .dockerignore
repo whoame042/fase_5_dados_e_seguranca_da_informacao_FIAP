@@ -1,0 +1,163 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+ARCHITECTURE.md
+INSTRUCOES_USO.md
+RESUMO_PROJETO.md
+VALIDACAO_INTEGRIDADE.md
+*.md
+
+# IDE - IntelliJ IDEA
+.idea
+*.iws
+*.iml
+*.ipr
+
+# IDE - Eclipse
+.project
+.classpath
+.settings
+.metadata
+
+# IDE - VSCode
+.vscode
+
+# Maven wrapper (already in image or not needed)
+.mvn
+mvnw
+mvnw.cmd
+
+# Source code (not needed as we copy only target)
+src/
+pom.xml
+
+# Build artifacts that will be copied separately
+target/maven-status/
+target/maven-archiver/
+target/generated-sources/
+target/generated-test-sources/
+target/test-classes/
+target/surefire-reports/
+target/classes/
+
+# Tests
+src/test/
+*Test.java
+*Tests.java
+
+# Kubernetes
+k8s/
+*.yaml
+*.yml
+deployment.yaml
+service.yaml
+
+# Scripts
+*.sh
+build-and-deploy.sh
+reset-database.sh
+maven-build.sh
+run-tests.sh
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+jenkins/
+Jenkinsfile
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+init-data.sql
+
+# Environment files
+.env
+.env.*
+*.properties
+!application.properties
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+
+# Coverage and test reports
+coverage/
+.nyc_output
+test-results/
+
+# Mac OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.directory
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Cache
+.cache/
+*.cache
+
+# Package files (source distribution)
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
+# Development tools
+.editorconfig
+.prettierrc
+.eslintrc
+
+# Documentation
+docs/
+*.pdf
+*.doc
+*.docx
+
+# Media files (if not needed in image)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+
+# Other unnecessary files for Docker image
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md

@@ -1,0 +1,131 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-database-job
+  namespace: vehicle-resale
+  labels:
+    app: init-database
+    app.kubernetes.io/name: init-database
+    app.kubernetes.io/part-of: vehicle-resale-system
+  annotations:
+    description: "Job para inicializar o banco de dados com dados de teste"
+spec:
+  # Tenta 3 vezes se falhar
+  backoffLimit: 3
+  
+  # Mantem historico do job por 24 horas
+  ttlSecondsAfterFinished: 86400
+  
+  template:
+    metadata:
+      labels:
+        app: init-database
+    spec:
+      # Usa init container para aguardar o PostgreSQL estar pronto
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              echo "Aguardando PostgreSQL ficar pronto..."
+              until pg_isready -h $DB_HOST -p 5432 -U $DB_USER; do
+                echo "PostgreSQL não está pronto ainda. Aguardando..."
+                sleep 2
+              done
+              echo "PostgreSQL está pronto!"
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: DB_HOST
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_USER
+      
+      # Container principal que executa o SQL
+      containers:
+        - name: init-data
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              echo "=================================================="
+              echo "Iniciando aplicação dos dados iniciais..."
+              echo "=================================================="
+              echo ""
+              
+              # Verifica se já existem dados
+              VEHICLE_COUNT=$(psql -h $DB_HOST -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM vehicles WHERE id > 0;" 2>/dev/null || echo "0")
+              
+              if [ "$VEHICLE_COUNT" -gt 0 ]; then
+                echo "✓ Banco de dados já contém dados ($VEHICLE_COUNT veículos)"
+                echo "Pulando inicialização para evitar duplicação"
+                exit 0
+              fi
+              
+              echo "Aplicando script init-data.sql..."
+              psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f /scripts/init-data.sql
+              
+              if [ $? -eq 0 ]; then
+                echo ""
+                echo "=================================================="
+                echo "✓ Dados iniciais aplicados com sucesso!"
+                echo "=================================================="
+                
+                # Mostra estatísticas
+                echo ""
+                echo "Estatísticas do banco:"
+                psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c "SELECT 'Veículos' as tabela, COUNT(*) as total FROM vehicles UNION ALL SELECT 'Vendas', COUNT(*) FROM sales;"
+                echo ""
+              else
+                echo ""
+                echo "❌ Erro ao aplicar dados iniciais"
+                exit 1
+              fi
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: DB_HOST
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: init-data-volume
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      
+      volumes:
+        - name: init-data-volume
+          configMap:
+            name: init-data-sql
+      
+      # Não reinicia o pod se completar com sucesso
+      restartPolicy: OnFailure
+

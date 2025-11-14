@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: vehicle-resale
+
+bases:
+  - ../../base
+
+namePrefix: aws-
+
+patchesStrategicMerge:
+  - ingress-patch.yaml
+  - pvc-patch.yaml
+  - deployment-patch.yaml
+
+resources:
+  - storageclass.yaml
+
+replicas:
+  - name: vehicle-resale-api
+    count: 2
+
+commonAnnotations:
+  environment: aws
+  cloud-provider: aws
+  managed-by: kustomize
+

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-vehicle-resale-postgres}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vehicle_resale}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "${POSTGRES_PORT:-5433}:${POSTGRES_INTERNAL_PORT:-5432}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-data.sql:/docker-entrypoint-initdb.d/init-data.sql
+    networks:
+      - vehicle-resale-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vehicle-resale-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ${APP_CONTAINER_NAME:-vehicle-resale-api}
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/vehicle_resale}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
+      QUARKUS_HTTP_PORT: ${QUARKUS_HTTP_PORT:-8080}
+      QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION: ${QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION:-update}
+      QUARKUS_HIBERNATE_ORM_LOG_SQL: ${QUARKUS_HIBERNATE_ORM_LOG_SQL:-true}
+      QUARKUS_LOG_LEVEL: ${QUARKUS_LOG_LEVEL:-INFO}
+      QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL: ${QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL:-DEBUG}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "${APP_PORT:-8080}:${QUARKUS_HTTP_PORT:-8080}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vehicle-resale-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${QUARKUS_HTTP_PORT:-8080}/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  vehicle-resale-network:
+    driver: bridge
+

@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: vehicle-resale
+
+bases:
+  - ../../base
+
+namePrefix: local-
+
+patchesStrategicMerge:
+  - ingress-patch.yaml
+  - pvc-patch.yaml
+  - configmap-patch.yaml
+  - postgres-configmap-patch.yaml
+  - init-data-job-patch.yaml
+
+replicas:
+  - name: vehicle-resale-api
+    count: 1
+
+commonAnnotations:
+  environment: local
+  managed-by: kustomize
+

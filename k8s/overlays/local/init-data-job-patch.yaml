@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-database-job
+  namespace: vehicle-resale
+  annotations:
+    description: "Job para inicializar o banco de dados local com dados de teste"
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: local-postgres-config
+                  key: DB_HOST
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: local-postgres-config
+                  key: POSTGRES_USER
+      containers:
+        - name: init-data
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: local-postgres-config
+                  key: DB_HOST
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: local-postgres-config
+                  key: POSTGRES_DB
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: local-postgres-config
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: local-postgres-secret
+                  key: POSTGRES_PASSWORD
+
