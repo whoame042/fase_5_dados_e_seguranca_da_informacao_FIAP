@@ -6,7 +6,7 @@ metadata:
   labels:
     app: vehicle-resale-api
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: vehicle-resale-api
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: vehicle-resale-api
-        image: vehicle-resale-api:1.0.0
+        image: vehicle-resale-api:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
