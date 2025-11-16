@@ -1,0 +1,80 @@
+version: '3.8'
+
+# Arquivo docker-compose para ambiente de desenvolvimento
+# Use: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # PostgreSQL - Banco de dados principal
+  postgres:
+    image: postgres:15-alpine
+    container_name: vehicle-resale-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vehicle_resale}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./init-data.sql:/docker-entrypoint-initdb.d/init-data.sql
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - Cache (opcional, descomente se necessário)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: vehicle-resale-redis-dev
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - dev-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 5
+  #   restart: unless-stopped
+
+  # Mailhog - Servidor SMTP para testes de email (opcional)
+  # mailhog:
+  #   image: mailhog/mailhog:latest
+  #   container_name: vehicle-resale-mailhog-dev
+  #   ports:
+  #     - "1025:1025"  # SMTP
+  #     - "8025:8025"  # Interface Web
+  #   networks:
+  #     - dev-network
+  #   restart: unless-stopped
+
+  # pgAdmin - Interface web para PostgreSQL (opcional)
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: vehicle-resale-pgadmin-dev
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+  #     PGADMIN_CONFIG_SERVER_MODE: 'False'
+  #   ports:
+  #     - "5050:80"
+  #   networks:
+  #     - dev-network
+  #   depends_on:
+  #     - postgres
+  #   restart: unless-stopped
+
+volumes:
+  postgres-dev-data:
+    driver: local
+
+networks:
+  dev-network:
+    driver: bridge
+    name: vehicle-resale-dev-network
+

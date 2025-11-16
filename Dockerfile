@@ -15,7 +15,7 @@ COPY --chown=185 target/quarkus-app/app/ /work/app/
 COPY --chown=185 target/quarkus-app/quarkus/ /work/quarkus/
 
 # Expõe a porta padrão
-EXPOSE 8080
+EXPOSE 8082
 
 # Define o usuário não-root
 USER 185

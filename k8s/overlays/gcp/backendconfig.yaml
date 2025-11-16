@@ -6,7 +6,7 @@ metadata:
 spec:
   healthCheck:
     checkIntervalSec: 15
-    port: 8080
+    port: 8082
     type: HTTP
     requestPath: /health/ready
   connectionDraining:

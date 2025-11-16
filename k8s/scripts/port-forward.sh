@@ -16,7 +16,7 @@ NC='\033[0m'
 
 NAMESPACE="${1:-vehicle-resale}"
 SERVICE="${2:-local-vehicle-resale-api-service}"
-LOCAL_PORT="${3:-8080}"
+LOCAL_PORT="${3:-8082}"
 SERVICE_PORT="${4:-80}"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"

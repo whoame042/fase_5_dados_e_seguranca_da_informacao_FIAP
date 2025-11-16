@@ -125,7 +125,7 @@ docker run --name postgres-vehicle -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=
 ./mvnw quarkus:dev
 ```
 
-A aplicação estará disponível em `http://localhost:8080`
+A aplicação estará disponível em `http://localhost:8082`
 
 ### Compilação do Projeto
 
@@ -449,7 +449,7 @@ O Deployment define:
 O Service expõe a aplicação:
 - Tipo: LoadBalancer
 - Porta externa: 80
-- Porta interna: 8080
+- Porta interna: 8082
 
 ### PostgreSQL
 Deploy completo do PostgreSQL incluindo:

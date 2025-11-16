@@ -127,10 +127,10 @@ kubectl logs -n vehicle-resale <job-pod-name>
 
 ```bash
 # Port-forward para acessar API
-kubectl port-forward -n vehicle-resale service/local-vehicle-resale-api-service 8080:80
+kubectl port-forward -n vehicle-resale service/local-vehicle-resale-api-service 8082:80
 
 # Em outro terminal, listar veículos
-curl http://localhost:8080/vehicles | jq length
+curl http://localhost:8082/vehicles | jq length
 # Deve retornar: 23
 ```
 
@@ -345,18 +345,18 @@ Após inicialização bem-sucedida:
 
 1. **Testar API:**
    ```bash
-   kubectl port-forward -n vehicle-resale service/local-vehicle-resale-api-service 8080:80
-   curl http://localhost:8080/vehicles
+   kubectl port-forward -n vehicle-resale service/local-vehicle-resale-api-service 8082:80
+   curl http://localhost:8082/vehicles
    ```
 
 2. **Ver Swagger UI:**
    ```bash
-   http://localhost:8080/q/swagger-ui
+   http://localhost:8082/q/swagger-ui
    ```
 
 3. **Fazer uma venda:**
    ```bash
-   curl -X POST http://localhost:8080/sales \
+   curl -X POST http://localhost:8082/sales \
      -H "Content-Type: application/json" \
      -d '{
        "vehicleId": 1,

@@ -12,8 +12,8 @@
 docker-compose up
 
 # 3. Acesse a aplicação
-# API: http://localhost:8080
-# Swagger: http://localhost:8080/swagger-ui
+# API: http://localhost:8082
+# Swagger: http://localhost:8082/swagger-ui
 ```
 
 **Observações:**
@@ -56,7 +56,7 @@ nano .env
 | `POSTGRES_USER` | Usuário do banco | `postgres` |
 | `POSTGRES_PASSWORD` | Senha do banco | `postgres123` |
 | `POSTGRES_PORT` | Porta externa | `5433` |
-| `APP_PORT` | Porta da API | `8080` |
+| `APP_PORT` | Porta da API | `8082` |
 | `QUARKUS_LOG_LEVEL` | Nível de log | `INFO` |
 
 ### Exemplo: Mudar Portas
@@ -97,13 +97,13 @@ docker run --name postgres-dev \
 ./mvnw quarkus:dev
 
 # 3. Acesse
-# API: http://localhost:8080
-# Swagger: http://localhost:8080/swagger-ui
+# API: http://localhost:8082
+# Swagger: http://localhost:8082/swagger-ui
 ```
 
 **Vantagens:**
 - Live reload (mudanças no código refletem automaticamente)
-- Dev UI em http://localhost:8080/q/dev
+- Dev UI em http://localhost:8082/q/dev
 - Mais rápido para desenvolvimento
 
 ---
@@ -180,7 +180,7 @@ docker-compose up
 
 ### Via Swagger UI (Mais Fácil)
 
-1. Acesse: `http://localhost:8080/swagger-ui`
+1. Acesse: `http://localhost:8082/swagger-ui`
 2. Explore os endpoints disponíveis
 3. Clique em "Try it out" para testar
 4. Execute as requisições diretamente pela interface
@@ -190,7 +190,7 @@ docker-compose up
 #### 1. Cadastrar um veículo
 
 ```bash
-curl -X POST http://localhost:8080/api/vehicles \
+curl -X POST http://localhost:8082/api/vehicles \
   -H "Content-Type: application/json" \
   -d '{
     "brand": "Toyota",
@@ -204,19 +204,19 @@ curl -X POST http://localhost:8080/api/vehicles \
 #### 2. Listar veículos disponíveis
 
 ```bash
-curl http://localhost:8080/api/vehicles/available
+curl http://localhost:8082/api/vehicles/available
 ```
 
 #### 3. Listar com paginação e filtros
 
 ```bash
-curl "http://localhost:8080/api/vehicles/available?brand=Toyota&page=0&size=10"
+curl "http://localhost:8082/api/vehicles/available?brand=Toyota&page=0&size=10"
 ```
 
 #### 4. Efetuar uma venda
 
 ```bash
-curl -X POST http://localhost:8080/api/sales \
+curl -X POST http://localhost:8082/api/sales \
   -H "Content-Type: application/json" \
   -d '{
     "vehicleId": 1,
@@ -230,7 +230,7 @@ curl -X POST http://localhost:8080/api/sales \
 #### 5. Processar pagamento (webhook)
 
 ```bash
-curl -X POST http://localhost:8080/api/webhook/payment \
+curl -X POST http://localhost:8082/api/webhook/payment \
   -H "Content-Type: application/json" \
   -d '{
     "paymentCode": "<codigo-retornado-na-venda>",
@@ -272,16 +272,16 @@ curl -X POST http://localhost:8080/api/webhook/payment \
 
 ```bash
 # Health check geral
-curl http://localhost:8080/health
+curl http://localhost:8082/health
 
 # Liveness (está vivo?)
-curl http://localhost:8080/health/live
+curl http://localhost:8082/health/live
 
 # Readiness (está pronto?)
-curl http://localhost:8080/health/ready
+curl http://localhost:8082/health/ready
 
 # Métricas Prometheus
-curl http://localhost:8080/metrics
+curl http://localhost:8082/metrics
 ```
 
 ---
@@ -315,15 +315,15 @@ kubectl get events -n vehicle-resale --sort-by='.lastTimestamp'
 
 ## Troubleshooting
 
-### Problema: Porta 8080 já está em uso
+### Problema: Porta 8082 já está em uso
 
 ```bash
 # Descobrir o que está usando a porta
-lsof -i :8080
+lsof -i :8082
 
 # Ou mude a porta no docker-compose.yml
 ports:
-  - "8081:8080"  # Usar porta 8081 externamente
+  - "8081:8082"  # Usar porta 8081 externamente
 ```
 
 ### Problema: PostgreSQL não conecta
@@ -373,12 +373,12 @@ kubectl get events -n vehicle-resale
 
 | Recurso | URL | Descrição |
 |---------|-----|-----------|
-| API Base | http://localhost:8080 | Endpoint raiz |
-| Swagger UI | http://localhost:8080/swagger-ui | Documentação interativa |
-| OpenAPI JSON | http://localhost:8080/openapi | Especificação OpenAPI |
-| Health Check | http://localhost:8080/health | Status da aplicação |
-| Métricas | http://localhost:8080/metrics | Métricas Prometheus |
-| Dev UI | http://localhost:8080/q/dev | Interface de dev (modo dev) |
+| API Base | http://localhost:8082 | Endpoint raiz |
+| Swagger UI | http://localhost:8082/swagger-ui | Documentação interativa |
+| OpenAPI JSON | http://localhost:8082/openapi | Especificação OpenAPI |
+| Health Check | http://localhost:8082/health | Status da aplicação |
+| Métricas | http://localhost:8082/metrics | Métricas Prometheus |
+| Dev UI | http://localhost:8082/q/dev | Interface de dev (modo dev) |
 
 ---
 
@@ -391,7 +391,7 @@ kubectl get events -n vehicle-resale
 ./TESTE_MELHORIAS.md  # Ver exemplos completos
 
 # Ou manualmente:
-curl -X POST http://localhost:8080/api/vehicles \
+curl -X POST http://localhost:8082/api/vehicles \
   -H "Content-Type: application/json" \
   -d '{
     "brand": "Honda",
@@ -401,7 +401,7 @@ curl -X POST http://localhost:8080/api/vehicles \
     "price": 110000.00
   }'
 
-curl -X POST http://localhost:8080/api/vehicles \
+curl -X POST http://localhost:8082/api/vehicles \
   -H "Content-Type: application/json" \
   -d '{
     "brand": "Volkswagen",
@@ -492,7 +492,7 @@ kubectl get services -n vehicle-resale
 kubectl logs -f <pod-name> -n vehicle-resale
 
 # Port forward (acesso local)
-kubectl port-forward -n vehicle-resale service/vehicle-resale-api-service 8080:80
+kubectl port-forward -n vehicle-resale service/vehicle-resale-api-service 8082:80
 ```
 ---
 

@@ -18,7 +18,7 @@ A API de Revenda de Veículos foi desenvolvida seguindo os princípios da **Clea
 │  │          Vehicle Resale API Pods (x2 replicas)         │ │
 │  │                                                          │ │
 │  │  ┌──────────────────────────────────────────────────┐  │ │
-│  │  │         Quarkus Application (Port 8080)          │  │ │
+│  │  │         Quarkus Application (Port 8082)          │  │ │
 │  │  │                                                    │  │ │
 │  │  │  ┌─────────────────────────────────────────────┐ │  │ │
 │  │  │  │         API Layer (Resources)               │ │  │ │

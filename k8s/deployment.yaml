@@ -20,7 +20,7 @@ spec:
         image: vehicle-resale-api:1.0.0
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8080
+        - containerPort: 8082
           name: http
           protocol: TCP
         env:
@@ -74,7 +74,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health/live
-            port: 8080
+            port: 8082
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -82,7 +82,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /health/ready
-            port: 8080
+            port: 8082
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
