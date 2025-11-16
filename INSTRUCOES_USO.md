@@ -494,19 +494,6 @@ kubectl logs -f <pod-name> -n vehicle-resale
 # Port forward (acesso local)
 kubectl port-forward -n vehicle-resale service/vehicle-resale-api-service 8080:80
 ```
-
----
-
-## Próximos Passos
-
-Depois de testar localmente, veja:
-
-- `README.md` - Documentação completa
-- `API_EXAMPLES.md` - Mais exemplos de uso
-- `ARCHITECTURE.md` - Arquitetura detalhada
-- `MELHORIAS_IMPLEMENTADAS.md` - Features extras
-- `CHECKLIST_ENTREGAVEIS.md` - Verificação de requisitos
-
 ---
 
 ## Suporte
