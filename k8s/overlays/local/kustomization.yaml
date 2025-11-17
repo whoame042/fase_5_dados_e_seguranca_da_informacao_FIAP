@@ -14,6 +14,7 @@ patchesStrategicMerge:
   - configmap-patch.yaml
   - postgres-configmap-patch.yaml
   - init-data-job-patch.yaml
+  - deployment-patch.yaml
 
 replicas:
   - name: vehicle-resale-api

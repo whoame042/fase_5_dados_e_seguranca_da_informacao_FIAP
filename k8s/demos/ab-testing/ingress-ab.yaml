@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vehicle-resale-api-ab-ingress
+  namespace: vehicle-resale
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # A/B Testing baseado em cookie ou header
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Version"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "B"
+    nginx.ingress.kubernetes.io/canary-by-cookie: "version"
+    # Se o cookie "version=B" ou header "X-Version: B", roteia para versão B
+    # Caso contrário, roteia para versão A
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: vehicle-resale-api-ab.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vehicle-resale-api-version-b-service  # Canary (versão B)
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vehicle-resale-api-ab-base-ingress
+  namespace: vehicle-resale
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: vehicle-resale-api-ab.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vehicle-resale-api-version-a-service  # Base (versão A)
+            port:
+              number: 80
+
