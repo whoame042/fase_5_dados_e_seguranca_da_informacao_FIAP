@@ -144,12 +144,12 @@ class SaleServiceTest {
         Sale result = saleService.updatePaymentStatus("test-payment-code", true);
 
         // Then
-        assertEquals(PaymentStatus.PAID, result.paymentStatus);
+        assertEquals(PaymentStatus.APPROVED, result.paymentStatus);
         verify(saleRepository, times(1)).persist(testSale);
     }
 
     @Test
-    void testUpdatePaymentStatus_Cancelled() {
+    void testUpdatePaymentStatus_Rejected() {
         // Given
         when(saleRepository.findByPaymentCode("test-payment-code"))
             .thenReturn(Optional.of(testSale));
@@ -159,14 +159,14 @@ class SaleServiceTest {
         Sale result = saleService.updatePaymentStatus("test-payment-code", false);
 
         // Then
-        assertEquals(PaymentStatus.CANCELLED, result.paymentStatus);
+        assertEquals(PaymentStatus.REJECTED, result.paymentStatus);
         verify(saleRepository, times(1)).persist(testSale);
     }
 
     @Test
     void testUpdatePaymentStatus_AlreadyProcessed() {
         // Given
-        testSale.paymentStatus = PaymentStatus.PAID;
+        testSale.paymentStatus = PaymentStatus.APPROVED;
         when(saleRepository.findByPaymentCode("test-payment-code"))
             .thenReturn(Optional.of(testSale));
 

@@ -60,7 +60,7 @@ public class SaleService {
             throw new IllegalStateException("Pagamento já foi processado");
         }
         
-        sale.paymentStatus = paid ? PaymentStatus.PAID : PaymentStatus.CANCELLED;
+        sale.paymentStatus = paid ? PaymentStatus.APPROVED : PaymentStatus.REJECTED;
         saleRepository.persist(sale);
         
         return sale;
