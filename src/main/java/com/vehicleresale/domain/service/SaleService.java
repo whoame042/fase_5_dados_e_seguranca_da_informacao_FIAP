@@ -1,6 +1,8 @@
 package com.vehicleresale.domain.service;
 
 import com.vehicleresale.api.dto.SaleRequestDTO;
+import com.vehicleresale.application.controller.VehicleController;
+import com.vehicleresale.application.gateway.VehicleGateway;
 import com.vehicleresale.domain.entity.Sale;
 import com.vehicleresale.domain.entity.Vehicle;
 import com.vehicleresale.domain.enums.PaymentStatus;
@@ -17,8 +19,19 @@ public class SaleService {
     @Inject
     SaleRepository saleRepository;
 
+    /**
+     * Injeta VehicleController Clean Architecture
+     * (não mais VehicleService direto)
+     */
     @Inject
-    VehicleService vehicleService;
+    VehicleController vehicleController;
+    
+    /**
+     * Injeta VehicleGateway para buscar entidades
+     * (isola persistência)
+     */
+    @Inject
+    VehicleGateway vehicleGateway;
 
     public Sale findById(Long id) {
         return saleRepository.findByIdOptional(id)
@@ -32,10 +45,12 @@ public class SaleService {
 
     @Transactional
     public Sale create(SaleRequestDTO dto) {
-        Vehicle vehicle = vehicleService.findById(dto.vehicleId);
+        // Busca veículo via Gateway (retorna Entity pura)
+        Vehicle vehicle = vehicleGateway.findById(dto.vehicleId)
+                .orElseThrow(() -> new NotFoundException("Veículo não encontrado com ID: " + dto.vehicleId));
         
-        // Marca o veículo como vendido
-        vehicleService.markAsSold(vehicle.id);
+        // Marca o veículo como vendido usando Controller Clean
+        vehicleController.markAsSold(vehicle.id);
         
         // Cria a venda
         Sale sale = new Sale();

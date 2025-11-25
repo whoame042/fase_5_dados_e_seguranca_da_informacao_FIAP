@@ -4,7 +4,7 @@ import com.vehicleresale.api.dto.PageDTO;
 import com.vehicleresale.api.dto.VehicleFilterDTO;
 import com.vehicleresale.api.dto.VehicleRequestDTO;
 import com.vehicleresale.api.dto.VehicleResponseDTO;
-import com.vehicleresale.domain.service.VehicleService;
+import com.vehicleresale.application.controller.VehicleController;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
@@ -16,17 +16,30 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import java.util.List;
-import java.util.stream.Collectors;
 
+/**
+ * REST Adapter - Camada de Interface com HTTP.
+ * 
+ * Responsabilidades:
+ * - Mapear requisições HTTP para chamadas do Controller Clean
+ * - Tratar status HTTP (200, 201, 404, etc.)
+ * - Validar dados de entrada (@Valid)
+ * - Documentar API (OpenAPI/Swagger)
+ * - NÃO conter lógica de negócio
+ * - Delegar tudo para o Controller Clean Architecture
+ */
 @Path("/api/vehicles")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Veiculos", description = "Operacoes relacionadas a veiculos")
 public class VehicleResource {
 
+    /**
+     * Injeta Controller Clean Architecture (não mais Service direto)
+     * Controller orquestra Gateway + Presenter + Use Case
+     */
     @Inject
-    VehicleService vehicleService;
+    VehicleController vehicleController;
 
     @GET
     @Path("/available")
@@ -61,6 +74,7 @@ public class VehicleResource {
             @Parameter(description = "Filtro por preco maximo")
             @QueryParam("priceTo") Double priceTo) {
         
+        // Monta o filtro (responsabilidade do adapter HTTP)
         VehicleFilterDTO filter = new VehicleFilterDTO();
         filter.brand = brand;
         filter.model = model;
@@ -71,7 +85,10 @@ public class VehicleResource {
         filter.priceFrom = priceFrom;
         filter.priceTo = priceTo;
         
-        PageDTO<VehicleResponseDTO> vehicles = vehicleService.findAvailableVehiclesPaginated(page, size, filter);
+        // Delega para Controller Clean Architecture
+        PageDTO<VehicleResponseDTO> vehicles = vehicleController.listAvailableVehicles(page, size, filter);
+        
+        // Retorna resposta HTTP
         return Response.ok(vehicles).build();
     }
 
@@ -108,6 +125,7 @@ public class VehicleResource {
             @Parameter(description = "Filtro por preco maximo")
             @QueryParam("priceTo") Double priceTo) {
         
+        // Monta o filtro
         VehicleFilterDTO filter = new VehicleFilterDTO();
         filter.brand = brand;
         filter.model = model;
@@ -118,7 +136,8 @@ public class VehicleResource {
         filter.priceFrom = priceFrom;
         filter.priceTo = priceTo;
         
-        PageDTO<VehicleResponseDTO> vehicles = vehicleService.findSoldVehiclesPaginated(page, size, filter);
+        // Delega para Controller Clean
+        PageDTO<VehicleResponseDTO> vehicles = vehicleController.listSoldVehicles(page, size, filter);
         return Response.ok(vehicles).build();
     }
 
@@ -140,7 +159,8 @@ public class VehicleResource {
     public Response getVehicleById(
             @Parameter(description = "ID do veiculo", required = true)
             @PathParam("id") Long id) {
-        VehicleResponseDTO vehicle = new VehicleResponseDTO(vehicleService.findById(id));
+        // Delega para Controller Clean
+        VehicleResponseDTO vehicle = vehicleController.getVehicleById(id);
         return Response.ok(vehicle).build();
     }
 
@@ -159,7 +179,8 @@ public class VehicleResource {
         description = "Dados invalidos"
     )
     public Response createVehicle(@Valid VehicleRequestDTO request) {
-        VehicleResponseDTO vehicle = new VehicleResponseDTO(vehicleService.create(request));
+        // Delega para Controller Clean
+        VehicleResponseDTO vehicle = vehicleController.createVehicle(request);
         return Response.status(Response.Status.CREATED).entity(vehicle).build();
     }
 
@@ -186,7 +207,8 @@ public class VehicleResource {
             @Parameter(description = "ID do veiculo", required = true)
             @PathParam("id") Long id,
             @Valid VehicleRequestDTO request) {
-        VehicleResponseDTO vehicle = new VehicleResponseDTO(vehicleService.update(id, request));
+        // Delega para Controller Clean
+        VehicleResponseDTO vehicle = vehicleController.updateVehicle(id, request);
         return Response.ok(vehicle).build();
     }
 
@@ -211,8 +233,8 @@ public class VehicleResource {
     public Response deleteVehicle(
             @Parameter(description = "ID do veiculo", required = true)
             @PathParam("id") Long id) {
-        vehicleService.delete(id);
+        // Delega para Controller Clean
+        vehicleController.deleteVehicle(id);
         return Response.noContent().build();
     }
 }
-
