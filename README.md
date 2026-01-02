@@ -1,552 +1,479 @@
-# API de Revenda de Veículos
+# API de Revenda de Veiculos
 
-Sistema de gerenciamento de revenda de veículos automotores, desenvolvido com Quarkus e pronto para deploy em Kubernetes.
+Sistema de gerenciamento de revenda de veiculos automotores, desenvolvido com Quarkus e pronto para deploy em Kubernetes.
 
-## Sumário
+## Sumario
 
 - [Sobre o Projeto](#sobre-o-projeto)
+- [Requisitos de Negocio](#requisitos-de-negocio)
+- [Arquitetura da Solucao](#arquitetura-da-solucao)
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
-- [Arquitetura da Solução](#arquitetura-da-solução)
 - [Modelo de Dados](#modelo-de-dados)
-- [Funcionalidades](#funcionalidades)
-- [Pré-requisitos](#pré-requisitos)
-- [Instalação e Execução](#instalação-e-execução)
-- [Build e Deploy com Kubernetes](#build-e-deploy-com-kubernetes)
-- [Documentação da API](#documentação-da-api)
+- [Pre-requisitos](#pre-requisitos)
+- [Instalacao e Execucao Local](#instalacao-e-execucao-local)
+- [Autenticacao (Keycloak)](#autenticacao-keycloak)
 - [Endpoints da API](#endpoints-da-api)
+- [Fluxo Completo de Uso](#fluxo-completo-de-uso)
+- [Testes](#testes)
+- [CI/CD](#cicd)
+- [Deploy com Kubernetes](#deploy-com-kubernetes)
 
 ## Sobre o Projeto
 
-Este projeto foi desenvolvido para atender as necessidades de uma empresa de revenda de veículos automotores que deseja implantar uma plataforma na internet. O sistema permite o gerenciamento completo do ciclo de vida dos veículos, desde o cadastro até a venda e processamento de pagamentos.
+Este projeto foi desenvolvido como parte do Tech Challenge da Pos-Tech FIAP - Arquitetura de Software (SOAT). O sistema permite o gerenciamento completo do ciclo de vida dos veiculos, desde o cadastro ate a venda e processamento de pagamentos.
+
+**Trabalho Substitutivo - Fase 3**
+
+## Requisitos de Negocio
+
+O sistema atende aos seguintes requisitos:
+
+1. **Cadastro de Veiculos**: Cadastrar veiculos para venda com marca, modelo, ano, cor e preco
+2. **Edicao de Veiculos**: Permitir a edicao dos dados de veiculos disponiveis
+3. **Compra de Veiculos**: Permitir a compra via internet para pessoas cadastradas
+4. **Cadastro Previo de Compradores**: O cadastro do cliente deve ser feito ANTES da compra
+5. **Listagem de Veiculos a Venda**: Ordenados por preco (mais barato para mais caro)
+6. **Listagem de Veiculos Vendidos**: Ordenados por preco (mais barato para mais caro)
+
+### Requisito de Autenticacao Separada
+
+O processo de registro e autorizacao de compradores e feito de forma separada atraves do **Keycloak**, garantindo que os dados de clientes estejam separados dos dados transacionais relacionados as vendas dos veiculos.
+
+## Arquitetura da Solucao
+
+```
++------------------+     +------------------+     +------------------+
+|                  |     |                  |     |                  |
+|   Frontend       +---->+  Vehicle API     +---->+   PostgreSQL     |
+|   (Opcional)     |     |  (Quarkus)       |     |   (Transacional) |
+|                  |     |                  |     |                  |
++--------+---------+     +--------+---------+     +------------------+
+         |                        |
+         |                        |
+         v                        v
++--------+---------+     +--------+---------+
+|                  |     |                  |
+|   Keycloak       |     |   PostgreSQL     |
+|   (Auth Server)  |     |   (Keycloak)     |
+|                  |     |                  |
++------------------+     +------------------+
+
+Servicos Separados:
+- API de Veiculos: Dados transacionais (veiculos, vendas)
+- Keycloak: Autenticacao e autorizacao de usuarios
+```
+
+### Estrutura do Projeto
+
+```
+vehicle-resale-api/
+├── .github/
+│   └── workflows/           # Pipelines CI/CD
+│       ├── ci.yml           # Build e testes
+│       ├── cd.yml           # Deploy automatizado
+│       └── pr-check.yml     # Validacao de Pull Requests
+├── keycloak/
+│   └── realm-export.json    # Configuracao do realm Keycloak
+├── k8s/                     # Manifestos Kubernetes
+├── src/main/java/com/vehicleresale/
+│   ├── api/
+│   │   ├── dto/             # Data Transfer Objects
+│   │   ├── resource/        # REST Controllers
+│   │   └── exception/       # Exception Handlers
+│   ├── application/
+│   │   ├── controller/      # Clean Architecture Controllers
+│   │   ├── gateway/         # Gateways
+│   │   └── presenter/       # Presenters
+│   └── domain/
+│       ├── entity/          # Entidades JPA (Vehicle, Sale, Customer)
+│       ├── repository/      # Repositorios de dados
+│       ├── service/         # Regras de negocio
+│       └── enums/           # Enumeracoes
+└── docker-compose.yml       # Ambiente completo com Keycloak
+```
 
 ## Tecnologias Utilizadas
 
 - **Quarkus 3.6.4** - Framework Java nativo para Kubernetes
-- **Java 17** - Linguagem de programação
-- **Hibernate ORM com Panache** - Persistência de dados
+- **Java 17** - Linguagem de programacao
+- **Hibernate ORM com Panache** - Persistencia de dados
 - **PostgreSQL 15** - Banco de dados relacional
-- **OpenAPI/Swagger** - Documentação da API
-- **Docker** - Containerização
-- **Kubernetes** - Orquestração de containers
-- **Maven** - Gerenciamento de dependências
-
-## Arquitetura da Solução
-
-O projeto segue uma arquitetura em camadas:
-
-```
-vehicle-resale-api/
-├── src/main/java/com/vehicleresale/
-│   ├── api/
-│   │   ├── dto/              # Data Transfer Objects
-│   │   ├── resource/         # REST Controllers
-│   │   └── exception/        # Exception Handlers
-│   └── domain/
-│       ├── entity/           # Entidades JPA
-│       ├── repository/       # Repositórios de dados
-│       ├── service/          # Regras de negócio
-│       └── enums/            # Enumerações
-└── k8s/                      # Manifestos Kubernetes
-```
+- **Keycloak 23** - Servidor de autenticacao (OAuth2/OIDC)
+- **OpenAPI/Swagger** - Documentacao da API
+- **Docker** - Containerizacao
+- **Kubernetes** - Orquestracao de containers
+- **GitHub Actions** - CI/CD
+- **Maven** - Gerenciamento de dependencias
 
 ## Modelo de Dados
 
-### Entidade Vehicle (Veículo)
-- `id` (Long) - Identificador único
-- `brand` (String) - Marca do veículo
-- `model` (String) - Modelo do veículo
-- `year` (Integer) - Ano de fabricação
-- `color` (String) - Cor do veículo
-- `price` (BigDecimal) - Preço do veículo
-- `status` (VehicleStatus) - Status (AVAILABLE, SOLD)
-- `createdAt` (LocalDateTime) - Data de criação
-- `updatedAt` (LocalDateTime) - Data de atualização
+### Entidade Vehicle (Veiculo)
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | Long | Identificador unico |
+| brand | String | Marca do veiculo |
+| model | String | Modelo do veiculo |
+| year | Integer | Ano de fabricacao |
+| color | String | Cor do veiculo |
+| price | BigDecimal | Preco do veiculo |
+| status | VehicleStatus | Status (AVAILABLE, SOLD) |
+| createdAt | LocalDateTime | Data de criacao |
+| updatedAt | LocalDateTime | Data de atualizacao |
+
+### Entidade Customer (Cliente/Comprador)
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | Long | Identificador unico |
+| userId | String | ID do usuario no Keycloak |
+| name | String | Nome completo |
+| email | String | Email (unico) |
+| cpf | String | CPF (unico, 11 digitos) |
+| phone | String | Telefone |
+| address | String | Endereco |
+| city | String | Cidade |
+| state | String | Estado (UF) |
+| zipCode | String | CEP |
+| active | Boolean | Status ativo |
 
 ### Entidade Sale (Venda)
-- `id` (Long) - Identificador único
-- `vehicle` (Vehicle) - Veículo vendido
-- `buyerCpf` (String) - CPF do comprador
-- `saleDate` (LocalDate) - Data da venda
-- `salePrice` (BigDecimal) - Preço da venda
-- `paymentCode` (String) - Código do pagamento
-- `paymentStatus` (PaymentStatus) - Status do pagamento (PENDING, PAID, CANCELLED)
-- `createdAt` (LocalDateTime) - Data de criação
-- `updatedAt` (LocalDateTime) - Data de atualização
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | Long | Identificador unico |
+| vehicle | Vehicle | Veiculo vendido |
+| buyerName | String | Nome do comprador |
+| buyerEmail | String | Email do comprador |
+| buyerCpf | String | CPF do comprador |
+| saleDate | LocalDate | Data da venda |
+| salePrice | BigDecimal | Preco da venda |
+| paymentCode | String | Codigo do pagamento (UUID) |
+| paymentStatus | PaymentStatus | Status (PENDING, APPROVED, REJECTED) |
 
-## Funcionalidades
-
-1. **Cadastro de Veículos**
-   - Cadastrar um veículo com marca, modelo, ano, cor e preço
-   - Editar dados de veículos disponíveis
-   - Excluir veículos não vendidos
-
-2. **Gerenciamento de Vendas**
-   - Efetuar venda de veículo informando CPF do comprador e data
-   - Geração automática de código de pagamento
-   - Mudança automática do status do veículo para "vendido"
-
-3. **Listagens**
-   - Listar veículos disponíveis para venda (ordenados por preço crescente)
-   - Listar veículos vendidos (ordenados por preço crescente)
-
-4. **Webhook de Pagamento**
-   - Endpoint para processamento de pagamentos
-   - Atualização do status do pagamento (pago ou cancelado)
-
-5. **Documentação e Monitoramento**
-   - Documentação OpenAPI/Swagger disponível em `/swagger-ui`
-   - Health checks em `/health`
-   - Métricas Prometheus em `/metrics`
-
-## Pré-requisitos
+## Pre-requisitos
 
 - Java 17 ou superior
 - Maven 3.8+
-- Docker
-- Kubernetes (minikube, k3s, ou cluster cloud)
-- kubectl configurado
+- Docker e Docker Compose
+- Kubernetes (opcional para deploy)
 
-## Instalação e Execução
+## Instalacao e Execucao Local
 
-### Execução Local (Desenvolvimento)
+### 1. Clone o repositorio
 
-1. **Clone o repositório:**
 ```bash
+git clone <url-do-repositorio>
 cd vehicle-resale-api
 ```
 
-2. **Configure o banco de dados PostgreSQL:**
+### 2. Iniciar ambiente com Docker Compose
+
+Este comando inicia todos os servicos necessarios:
+- PostgreSQL (banco de dados da API)
+- Keycloak (servidor de autenticacao)
+- PostgreSQL do Keycloak
+
 ```bash
-docker run --name postgres-vehicle -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=vehicle_resale -p 5432:5432 -d postgres:15-alpine
+docker-compose up -d
 ```
 
-3. **Execute a aplicação em modo desenvolvimento:**
+Aguarde os servicos iniciarem (pode levar alguns minutos na primeira vez).
+
+### 3. Verificar status dos servicos
+
+```bash
+docker-compose ps
+```
+
+### 4. Executar a aplicacao em modo desenvolvimento
+
 ```bash
 ./mvnw quarkus:dev
 ```
 
-A aplicação estará disponível em `http://localhost:8082`
+A aplicacao estara disponivel em:
+- **API**: http://localhost:8082
+- **Swagger UI**: http://localhost:8082/swagger-ui
+- **Keycloak Console**: http://localhost:8180
 
-### Compilação do Projeto
+## Autenticacao (Keycloak)
 
-Para compilar o projeto:
-```bash
-./mvnw clean package
-```
+### Acessar Console Administrativo do Keycloak
 
-O arquivo JAR será gerado em `target/quarkus-app/`
+- URL: http://localhost:8180
+- Usuario: `admin`
+- Senha: `admin123`
 
-## Build e Deploy com Kubernetes
+### Usuarios Pre-configurados
 
-### Opção 1: Deploy Automatizado (Recomendado)
+| Usuario | Senha | Role | Descricao |
+|---------|-------|------|-----------|
+| admin@vehicleresale.com | admin123 | admin | Gerencia veiculos e ve todas as vendas |
+| comprador@teste.com | comprador123 | buyer | Visualiza veiculos e realiza compras |
 
-Use o script automatizado que faz build e deploy:
-
-```bash
-chmod +x build-and-deploy.sh
-./build-and-deploy.sh
-```
-
-### Opção 2: Deploy Manual
-
-#### 1. Build da Aplicação
-```bash
-./mvnw clean package -DskipTests
-```
-
-#### 2. Construir Imagem Docker
-```bash
-docker build -t vehicle-resale-api:1.0.0 .
-```
-
-#### 3. Deploy no Kubernetes
-
-Entre no diretório k8s e aplique os manifestos:
+### Obter Token de Acesso
 
 ```bash
-cd k8s
-chmod +x deploy.sh
-./deploy.sh
+# Token de administrador
+curl -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=vehicle-resale-api" \
+  -d "client_secret=vehicle-resale-secret" \
+  -d "grant_type=password" \
+  -d "username=admin@vehicleresale.com" \
+  -d "password=admin123"
+
+# Token de comprador
+curl -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=vehicle-resale-api" \
+  -d "client_secret=vehicle-resale-secret" \
+  -d "grant_type=password" \
+  -d "username=comprador@teste.com" \
+  -d "password=comprador123"
 ```
 
-Ou aplique manualmente na ordem:
+### Usar Token nas Requisicoes
 
 ```bash
-# Criar namespace
-kubectl apply -f namespace.yaml
-
-# PostgreSQL
-kubectl apply -f postgres-configmap.yaml
-kubectl apply -f postgres-secret.yaml
-kubectl apply -f postgres-pvc.yaml
-kubectl apply -f postgres-deployment.yaml
-kubectl apply -f postgres-service.yaml
-
-# Aplicação
-kubectl apply -f configmap.yaml
-kubectl apply -f secret.yaml
-kubectl apply -f deployment.yaml
-kubectl apply -f service.yaml
+curl -X GET "http://localhost:8082/api/customers/me" \
+  -H "Authorization: Bearer <seu_token_aqui>"
 ```
-
-### Verificar o Deploy
-
-```bash
-# Ver pods
-kubectl get pods -n vehicle-resale
-
-# Ver services
-kubectl get services -n vehicle-resale
-
-# Ver logs
-kubectl logs -f -l app=vehicle-resale-api -n vehicle-resale
-```
-
-### Acessar a Aplicação
-
-Para obter o IP/URL de acesso:
-
-```bash
-kubectl get service vehicle-resale-api-service -n vehicle-resale
-```
-
-Se estiver usando minikube:
-```bash
-minikube service vehicle-resale-api-service -n vehicle-resale
-```
-
-### Remover o Deploy
-
-```bash
-cd k8s
-chmod +x undeploy.sh
-./undeploy.sh
-```
-
-## Documentação da API
-
-A documentação completa da API está disponível através do Swagger UI:
-
-- **Swagger UI:** `http://<host>/swagger-ui`
-- **OpenAPI JSON:** `http://<host>/openapi`
 
 ## Endpoints da API
 
-### Veículos
+### Veiculos (Publicos para leitura)
 
-#### Listar veículos disponíveis
-```http
-GET /api/vehicles/available
-```
-Retorna todos os veículos disponíveis para venda, ordenados por preço (do mais barato para o mais caro).
+| Metodo | Endpoint | Descricao | Autenticacao |
+|--------|----------|-----------|--------------|
+| GET | /api/vehicles/available | Listar veiculos disponiveis | Nao |
+| GET | /api/vehicles/sold | Listar veiculos vendidos | Nao |
+| GET | /api/vehicles/{id} | Buscar veiculo por ID | Nao |
+| POST | /api/vehicles | Cadastrar veiculo | Sim (admin) |
+| PUT | /api/vehicles/{id} | Atualizar veiculo | Sim (admin) |
+| DELETE | /api/vehicles/{id} | Excluir veiculo | Sim (admin) |
 
-**Resposta de Sucesso:** `200 OK`
-```json
-[
-  {
-    "id": 1,
-    "brand": "Toyota",
-    "model": "Corolla",
-    "year": 2023,
-    "color": "Prata",
-    "price": 95000.00,
-    "status": "AVAILABLE",
-    "createdAt": "2024-01-15T10:30:00",
-    "updatedAt": "2024-01-15T10:30:00"
-  }
-]
-```
+### Clientes
 
-#### Listar veículos vendidos
-```http
-GET /api/vehicles/sold
-```
-Retorna todos os veículos vendidos, ordenados por preço (do mais barato para o mais caro).
-
-**Resposta de Sucesso:** `200 OK`
-
-#### Buscar veículo por ID
-```http
-GET /api/vehicles/{id}
-```
-
-**Resposta de Sucesso:** `200 OK`
-
-**Resposta de Erro:** `404 Not Found`
-
-#### Cadastrar novo veículo
-```http
-POST /api/vehicles
-Content-Type: application/json
-```
-
-**Body:**
-```json
-{
-  "brand": "Toyota",
-  "model": "Corolla",
-  "year": 2023,
-  "color": "Prata",
-  "price": 95000.00
-}
-```
-
-**Resposta de Sucesso:** `201 Created`
-
-**Validações:**
-- `brand`: obrigatório, máximo 100 caracteres
-- `model`: obrigatório, máximo 100 caracteres
-- `year`: obrigatório, entre 1900 e 2100
-- `color`: obrigatório, máximo 50 caracteres
-- `price`: obrigatório, maior que 0
-
-#### Atualizar veículo
-```http
-PUT /api/vehicles/{id}
-Content-Type: application/json
-```
-
-**Body:** Mesmo formato do cadastro
-
-**Resposta de Sucesso:** `200 OK`
-
-**Resposta de Erro:** 
-- `404 Not Found` - Veículo não encontrado
-- `400 Bad Request` - Veículo já vendido ou dados inválidos
-
-#### Excluir veículo
-```http
-DELETE /api/vehicles/{id}
-```
-
-**Resposta de Sucesso:** `204 No Content`
-
-**Resposta de Erro:**
-- `404 Not Found` - Veículo não encontrado
-- `400 Bad Request` - Não é possível excluir veículo já vendido
+| Metodo | Endpoint | Descricao | Autenticacao |
+|--------|----------|-----------|--------------|
+| GET | /api/customers | Listar todos os clientes | Sim (admin) |
+| GET | /api/customers/{id} | Buscar cliente por ID | Sim |
+| GET | /api/customers/me | Buscar meu cadastro | Sim |
+| GET | /api/customers/cpf/{cpf} | Buscar cliente por CPF | Sim (admin) |
+| GET | /api/customers/check/{cpf} | Verificar se CPF esta cadastrado | Sim |
+| POST | /api/customers | Cadastrar novo cliente | Sim |
+| PUT | /api/customers/{id} | Atualizar cliente | Sim |
+| DELETE | /api/customers/{id} | Desativar cliente | Sim (admin) |
 
 ### Vendas
 
-#### Buscar venda por ID
-```http
-GET /api/sales/{id}
+| Metodo | Endpoint | Descricao | Autenticacao |
+|--------|----------|-----------|--------------|
+| GET | /api/sales/{id} | Buscar venda por ID | Sim |
+| POST | /api/sales | Efetuar venda | Sim |
+
+### Webhook de Pagamento
+
+| Metodo | Endpoint | Descricao | Autenticacao |
+|--------|----------|-----------|--------------|
+| POST | /api/webhook/payment | Processar status de pagamento | Nao |
+
+## Fluxo Completo de Uso
+
+### 1. Cadastrar um novo usuario no Keycloak
+
+Acesse http://localhost:8180 e crie um novo usuario ou use os usuarios pre-configurados.
+
+### 2. Obter token de acesso
+
+```bash
+TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=vehicle-resale-api" \
+  -d "client_secret=vehicle-resale-secret" \
+  -d "grant_type=password" \
+  -d "username=admin@vehicleresale.com" \
+  -d "password=admin123" | jq -r '.access_token')
 ```
 
-**Resposta de Sucesso:** `200 OK`
-```json
-{
-  "id": 1,
-  "vehicle": {
-    "id": 1,
+### 3. Cadastrar veiculo (como admin)
+
+```bash
+curl -X POST "http://localhost:8082/api/vehicles" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
     "brand": "Toyota",
     "model": "Corolla",
     "year": 2023,
     "color": "Prata",
-    "price": 95000.00,
-    "status": "SOLD",
-    "createdAt": "2024-01-15T10:30:00",
-    "updatedAt": "2024-01-15T11:00:00"
-  },
-  "buyerCpf": "12345678901",
-  "saleDate": "2024-01-15",
-  "salePrice": 95000.00,
-  "paymentCode": "550e8400-e29b-41d4-a716-446655440000",
-  "paymentStatus": "PENDING",
-  "createdAt": "2024-01-15T11:00:00",
-  "updatedAt": "2024-01-15T11:00:00"
-}
+    "price": 95000.00
+  }'
 ```
 
-#### Efetuar venda de veículo
-```http
-POST /api/sales
-Content-Type: application/json
+### 4. Listar veiculos disponiveis
+
+```bash
+curl -X GET "http://localhost:8082/api/vehicles/available"
 ```
 
-**Body:**
-```json
-{
-  "vehicleId": 1,
-  "buyerCpf": "12345678901",
-  "saleDate": "2024-01-15"
-}
+### 5. Cadastrar cliente (OBRIGATORIO antes da compra)
+
+```bash
+curl -X POST "http://localhost:8082/api/customers" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Joao Silva",
+    "email": "joao@email.com",
+    "cpf": "12345678901",
+    "phone": "11999999999",
+    "address": "Rua Exemplo, 123",
+    "city": "Sao Paulo",
+    "state": "SP",
+    "zipCode": "01234567"
+  }'
 ```
 
-**Resposta de Sucesso:** `201 Created` (retorna objeto Sale com paymentCode gerado)
+### 6. Efetuar compra do veiculo
 
-**Validações:**
-- `vehicleId`: obrigatório
-- `buyerCpf`: obrigatório, 11 dígitos numéricos
-- `saleDate`: obrigatório
-
-**Resposta de Erro:**
-- `404 Not Found` - Veículo não encontrado
-- `400 Bad Request` - Veículo já vendido
-
-### Webhook de Pagamento
-
-#### Processar status de pagamento
-```http
-POST /api/webhook/payment
-Content-Type: application/json
+```bash
+curl -X POST "http://localhost:8082/api/sales" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "vehicleId": 1,
+    "buyerName": "Joao Silva",
+    "buyerEmail": "joao@email.com",
+    "buyerCpf": "12345678901",
+    "saleDate": "2024-01-15"
+  }'
 ```
 
-**Body:**
-```json
-{
-  "paymentCode": "550e8400-e29b-41d4-a716-446655440000",
-  "paid": true
-}
+### 7. Processar pagamento (webhook)
+
+```bash
+curl -X POST "http://localhost:8082/api/webhook/payment" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "paymentCode": "<codigo_retornado_na_venda>",
+    "paid": true
+  }'
 ```
 
-**Campos:**
-- `paymentCode`: Código do pagamento gerado na venda
-- `paid`: `true` para pagamento efetuado, `false` para cancelado
+### 8. Listar veiculos vendidos
 
-**Resposta de Sucesso:** `200 OK` (retorna objeto Sale atualizado)
-
-**Resposta de Erro:**
-- `404 Not Found` - Código de pagamento não encontrado
-- `400 Bad Request` - Pagamento já foi processado
-
-### Health Check e Métricas
-
-#### Health Check
-```http
-GET /health
-GET /health/live
-GET /health/ready
+```bash
+curl -X GET "http://localhost:8082/api/vehicles/sold"
 ```
 
-#### Métricas Prometheus
-```http
-GET /metrics
-```
+## Testes
 
-## Configurações do Kubernetes
+### Executar todos os testes
 
-### ConfigMap
-O ConfigMap contém as configurações da aplicação:
-- Porta da aplicação
-- URL do banco de dados
-- Configurações do Hibernate
-- Níveis de log
-
-### Secret
-Os Secrets contêm informações sensíveis:
-- Senha do banco de dados (base64 encoded)
-
-**Nota:** Em produção, sempre altere as senhas padrão!
-
-### Deployment
-O Deployment define:
-- 2 réplicas da aplicação
-- Resources (requests e limits)
-- Probes de liveness e readiness
-- Variáveis de ambiente
-
-### Service
-O Service expõe a aplicação:
-- Tipo: LoadBalancer
-- Porta externa: 80
-- Porta interna: 8082
-
-### PostgreSQL
-Deploy completo do PostgreSQL incluindo:
-- ConfigMap e Secret
-- PersistentVolumeClaim (5Gi)
-- Deployment com probes
-- Service interno (ClusterIP)
-
-## Estrutura de Arquivos Kubernetes
-
-```
-k8s/
-├── namespace.yaml              # Namespace vehicle-resale
-├── configmap.yaml              # Configurações da aplicação
-├── secret.yaml                 # Secrets da aplicação
-├── deployment.yaml             # Deployment da aplicação
-├── service.yaml                # Service da aplicação (LoadBalancer)
-├── postgres-configmap.yaml     # Configurações do PostgreSQL
-├── postgres-secret.yaml        # Secrets do PostgreSQL
-├── postgres-pvc.yaml           # PersistentVolumeClaim
-├── postgres-deployment.yaml    # Deployment do PostgreSQL
-├── postgres-service.yaml       # Service do PostgreSQL (ClusterIP)
-├── deploy.sh                   # Script de deploy
-└── undeploy.sh                 # Script de remoção
-```
-
-## Recursos e Limites
-
-### Aplicação
-- **Requests:** 512Mi memória, 500m CPU
-- **Limits:** 1Gi memória, 1000m CPU
-
-### PostgreSQL
-- **Requests:** 256Mi memória, 250m CPU
-- **Limits:** 512Mi memória, 500m CPU
-
-## Desenvolvimento
-
-### Executar testes
 ```bash
 ./mvnw test
 ```
 
-### Modo de desenvolvimento com live reload
+### Executar testes com cobertura
+
 ```bash
-./mvnw quarkus:dev
+./mvnw verify
 ```
 
-### Formato do código
+## CI/CD
+
+O projeto possui pipelines automatizados com GitHub Actions:
+
+### Pipeline de CI (ci.yml)
+- Executa em push/PR para branches main e develop
+- Build do projeto
+- Execucao de testes
+- Verificacao de qualidade do codigo
+
+### Pipeline de CD (cd.yml)
+- Executa em push para main ou tags de versao
+- Build da imagem Docker
+- Push para GitHub Container Registry
+- Deploy automatizado em staging/producao
+
+### Pipeline de PR (pr-check.yml)
+- Validacao de Pull Requests
+- Lint e validacao
+- Testes unitarios
+- Build da imagem Docker (sem push)
+- Scan de seguranca
+
+### Configurar Deploy Automatico
+
+1. Configure os secrets no repositorio GitHub:
+   - `KUBECONFIG`: Configuracao do cluster Kubernetes
+
+2. Configure os environments no GitHub:
+   - `staging`: Para deploys em ambiente de staging
+   - `production`: Para deploys em producao (requer aprovacao)
+
+## Deploy com Kubernetes
+
+### Deploy Local (Minikube)
+
 ```bash
-./mvnw spotless:apply
+# Iniciar Minikube
+minikube start
+
+# Build da imagem
+./mvnw clean package -DskipTests
+docker build -t vehicle-resale-api:1.0.0 .
+
+# Carregar imagem no Minikube
+minikube image load vehicle-resale-api:1.0.0
+
+# Deploy
+cd k8s
+./deploy.sh
 ```
+
+### Deploy em Cloud
+
+Consulte os overlays disponiveis em `k8s/overlays/` para:
+- AWS
+- Azure
+- GCP
 
 ## Troubleshooting
 
-### Pods não iniciam
+### Keycloak nao inicia
+
 ```bash
-kubectl describe pod <pod-name> -n vehicle-resale
-kubectl logs <pod-name> -n vehicle-resale
+# Verificar logs
+docker-compose logs keycloak
+
+# Reiniciar servicos
+docker-compose restart keycloak
 ```
 
-### Verificar conectividade com banco de dados
+### Erro de conexao com banco de dados
+
 ```bash
-kubectl exec -it <app-pod-name> -n vehicle-resale -- /bin/sh
-# Dentro do pod
-curl postgres-service:5432
+# Verificar se PostgreSQL esta rodando
+docker-compose ps postgres
+
+# Verificar logs
+docker-compose logs postgres
 ```
 
-### Verificar configurações
-```bash
-kubectl get configmap vehicle-resale-config -n vehicle-resale -o yaml
-kubectl get secret vehicle-resale-secret -n vehicle-resale -o yaml
-```
+### Token invalido ou expirado
 
-## Segurança
+Obtenha um novo token usando o endpoint de autenticacao do Keycloak.
 
-- As senhas estão armazenadas em Secrets do Kubernetes
-- A aplicação roda como usuário não-root (UID 185)
-- CORS configurado para desenvolvimento (ajustar para produção)
-- Validações de entrada em todos os endpoints
+## Seguranca
 
-## Melhorias Futuras
+- Autenticacao via OAuth2/OIDC (Keycloak)
+- Tokens JWT para autorizacao
+- Senhas armazenadas em Secrets do Kubernetes
+- Aplicacao roda como usuario nao-root (UID 185)
+- Validacoes de entrada em todos os endpoints
 
-- Implementar autenticação e autorização (JWT)
-- Adicionar paginação nas listagens
-- Implementar cache com Redis
-- Adicionar testes de integração
-- Implementar CI/CD com GitHub Actions ou GitLab CI
-- Adicionar observabilidade com Jaeger/OpenTelemetry
-- Implementar backup automático do banco de dados
-- Adicionar HPA (Horizontal Pod Autoscaler)
+## Licenca
 
-## Suporte
-
-Para dúvidas ou problemas, consulte a documentação do Swagger ou entre em contato com a equipe de desenvolvimento.
-
-## Licença
-
-Projeto desenvolvido para fins educacionais - FIAP Pós-Tech Arquitetura de Software.
-
+Projeto desenvolvido para fins educacionais - FIAP Pos-Tech Arquitetura de Software.
+# fase_3_distribuicao_da_aplicacao_FIAP
