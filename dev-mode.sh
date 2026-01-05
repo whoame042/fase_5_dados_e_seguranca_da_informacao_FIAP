@@ -49,6 +49,19 @@ if ! nc -z localhost 5433 2>/dev/null; then
     fi
 fi
 
+# Verificar se Keycloak está rodando
+if ! nc -z localhost 8180 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Keycloak não está rodando na porta 8180!${NC}"
+    echo ""
+    echo "Solução: Inicie o Keycloak com docker-compose:"
+    echo "  docker-compose up -d keycloak-postgres keycloak"
+    echo ""
+    echo "Ou use: make dev-docker"
+    echo ""
+    echo -e "${YELLOW}Nota: A aplicação funcionará, mas endpoints protegidos podem falhar.$(NC)"
+    echo ""
+fi
+
 echo -e "${GREEN}Limpando cache do Quarkus...${NC}"
 rm -rf target/ .quarkus/
 echo ""

@@ -20,4 +20,7 @@ data:
   # Configuracoes de logging
   QUARKUS_LOG_LEVEL: "INFO"
   QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL: "DEBUG"
-
+  
+  # Configuracoes OIDC/Keycloak
+  QUARKUS_OIDC_AUTH_SERVER_URL: "http://keycloak-service:8180/realms/vehicle-resale"
+  QUARKUS_OIDC_CLIENT_ID: "vehicle-resale-api"

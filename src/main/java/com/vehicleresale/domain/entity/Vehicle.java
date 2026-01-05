@@ -27,7 +27,7 @@ public class Vehicle extends PanacheEntityBase {
     @Column(nullable = false, length = 100)
     public String model;
 
-    @Column(nullable = false)
+    @Column(name = "`year`", nullable = false)
     public Integer year;
 
     @Column(nullable = false, length = 50)

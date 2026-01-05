@@ -1,55 +1,56 @@
 #!/bin/bash
 
-# Script para deploy da aplicação no Kubernetes
+# Script simplificado para deploy da aplicação no Kubernetes
+# Usa kustomize para aplicar todos os recursos de uma vez
 
-echo "Iniciando deploy da aplicacao Vehicle Resale API..."
+set -e
 
-# Criar namespace
-echo "1. Criando namespace..."
-kubectl apply -f namespace.yaml
-
-# Aplicar ConfigMaps e Secrets do PostgreSQL
-echo "2. Aplicando ConfigMaps e Secrets do PostgreSQL..."
-kubectl apply -f postgres-configmap.yaml
-kubectl apply -f postgres-secret.yaml
-
-# Aplicar PVC
-echo "3. Criando PersistentVolumeClaim..."
-kubectl apply -f postgres-pvc.yaml
-
-# Aplicar Deployment e Service do PostgreSQL
-echo "4. Criando Deployment e Service do PostgreSQL..."
-kubectl apply -f postgres-deployment.yaml
-kubectl apply -f postgres-service.yaml
-
-# Aguardar PostgreSQL estar pronto
-echo "5. Aguardando PostgreSQL estar pronto..."
-kubectl wait --for=condition=ready pod -l app=postgres -n vehicle-resale --timeout=300s
-
-# Aplicar ConfigMaps e Secrets da aplicação
-echo "6. Aplicando ConfigMaps e Secrets da aplicacao..."
-kubectl apply -f configmap.yaml
-kubectl apply -f secret.yaml
-
-# Aplicar Deployment e Service da aplicação
-echo "7. Criando Deployment e Service da aplicacao..."
-kubectl apply -f deployment.yaml
-kubectl apply -f service.yaml
-
-# Aguardar pods da aplicação estarem prontos
-echo "8. Aguardando pods da aplicacao estarem prontos..."
-kubectl wait --for=condition=ready pod -l app=vehicle-resale-api -n vehicle-resale --timeout=300s
-
-echo ""
-echo "Deploy concluido com sucesso!"
-echo ""
-echo "Para verificar o status dos pods:"
-echo "  kubectl get pods -n vehicle-resale"
-echo ""
-echo "Para verificar os services:"
-echo "  kubectl get services -n vehicle-resale"
-echo ""
-echo "Para acessar os logs da aplicacao:"
-echo "  kubectl logs -f -l app=vehicle-resale-api -n vehicle-resale"
+echo "=========================================="
+echo "  Deploy Vehicle Resale API - Kubernetes"
+echo "=========================================="
 echo ""
 
+# Verificar se kustomize está instalado
+if ! command -v kustomize &> /dev/null && ! kubectl kustomize --help &> /dev/null; then
+    echo "❌ Erro: kustomize não encontrado"
+    echo "   Instale kustomize ou use kubectl >= 1.14"
+    exit 1
+fi
+
+# Aplicar recursos usando kustomize
+echo "📦 Aplicando recursos do Kubernetes..."
+if command -v kustomize &> /dev/null; then
+    kustomize build base/ | kubectl apply -f -
+else
+    kubectl apply -k base/
+fi
+
+echo ""
+echo "⏳ Aguardando pods ficarem prontos..."
+
+# Aguardar PostgreSQL
+echo "  - Aguardando PostgreSQL..."
+kubectl wait --for=condition=ready pod -l app=postgres -n vehicle-resale --timeout=120s || true
+
+# Aguardar Keycloak
+echo "  - Aguardando Keycloak..."
+kubectl wait --for=condition=ready pod -l app=keycloak -n vehicle-resale --timeout=180s || true
+
+# Aguardar API
+echo "  - Aguardando API..."
+kubectl wait --for=condition=ready pod -l app=vehicle-resale-api -n vehicle-resale --timeout=120s || true
+
+echo ""
+echo "✅ Deploy concluído!"
+echo ""
+echo "📊 Status dos pods:"
+kubectl get pods -n vehicle-resale
+echo ""
+echo "🌐 Services:"
+kubectl get services -n vehicle-resale
+echo ""
+echo "💡 Para ver logs:"
+echo "   kubectl logs -f -l app=vehicle-resale-api -n vehicle-resale"
+echo ""
+echo "💡 Para port-forward:"
+echo "   kubectl port-forward -n vehicle-resale svc/vehicle-resale-api-service 8082:80"

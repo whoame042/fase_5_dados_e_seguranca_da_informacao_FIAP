@@ -48,6 +48,20 @@ else
     docker-compose up -d postgres
     POSTGRES_RUNNING=true
 fi
+
+# Verificar se Keycloak está rodando
+KEYCLOAK_RUNNING=false
+if docker-compose ps | grep "keycloak" | grep -q "Up (healthy)"; then
+    echo -e "   ${GREEN}✅ Keycloak já está rodando e saudável${NC}"
+    KEYCLOAK_RUNNING=true
+elif docker-compose ps | grep "keycloak" | grep -q "Up"; then
+    echo "   Keycloak está iniciando... aguardando ficar saudável"
+    KEYCLOAK_RUNNING=true
+else
+    echo "   Iniciando containers Keycloak (PostgreSQL + Keycloak)..."
+    docker-compose up -d keycloak-postgres keycloak
+    KEYCLOAK_RUNNING=true
+fi
 echo ""
 
 # Aguardar PostgreSQL ficar pronto
@@ -88,8 +102,38 @@ if [ "$POSTGRES_RUNNING" = true ]; then
 fi
 echo ""
 
+# Aguardar Keycloak ficar pronto
+if [ "$KEYCLOAK_RUNNING" = true ]; then
+    echo -e "${YELLOW}3. Aguardando Keycloak ficar pronto...${NC}"
+    MAX_ATTEMPTS=120
+    ATTEMPT=0
+    
+    while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+        if ! docker-compose ps | grep "keycloak" | grep -q "Up"; then
+            echo -e "\n   ${RED}❌ Container Keycloak parou de rodar${NC}"
+            docker-compose logs --tail=20 keycloak
+            exit 1
+        fi
+        
+        if curl -s http://localhost:8180/health/ready 2>/dev/null | grep -q "UP"; then
+            echo -e "\n   ${GREEN}✅ Keycloak está pronto e aceitando conexões!${NC}"
+            break
+        fi
+        
+        ATTEMPT=$((ATTEMPT + 1))
+        echo -n "."
+        sleep 2
+    done
+    
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo -e "\n   ${YELLOW}⚠️  Keycloak não iniciou completamente após $MAX_ATTEMPTS segundos${NC}"
+        echo "   Continuando mesmo assim... (pode causar avisos no Quarkus)"
+    fi
+    echo ""
+fi
+
 # Verificar dados no banco
-echo -e "${YELLOW}3. Verificando dados no banco...${NC}"
+echo -e "${YELLOW}4. Verificando dados no banco...${NC}"
 VEHICLE_COUNT=$(docker exec vehicle-resale-postgres psql -U postgres -d vehicle_resale -t -c "SELECT COUNT(*) FROM vehicles;" 2>/dev/null | xargs)
 if [ -n "$VEHICLE_COUNT" ]; then
     echo -e "   ${GREEN}✅ $VEHICLE_COUNT veículos encontrados no banco${NC}"
@@ -99,7 +143,7 @@ fi
 echo ""
 
 # Iniciar Quarkus
-echo -e "${GREEN}4. Iniciando Quarkus Dev Mode...${NC}"
+echo -e "${GREEN}5. Iniciando Quarkus Dev Mode...${NC}"
 echo -e "${YELLOW}   Pressione Ctrl+C para parar${NC}"
 echo ""
 

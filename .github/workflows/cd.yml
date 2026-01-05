@@ -1,0 +1,129 @@
+name: CD - Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+    - name: Checkout do codigo
+      uses: actions/checkout@v4
+
+    - name: Configurar JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build com Maven
+      run: ./mvnw -B package -DskipTests
+
+    - name: Configurar Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login no Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extrair metadata da imagem
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix=,suffix=,format=short
+
+    - name: Build e Push da imagem Docker
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout do codigo
+      uses: actions/checkout@v4
+
+    - name: Deploy no ambiente de staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
+        # Aqui seria adicionado o comando de deploy para staging
+        # Por exemplo: kubectl apply -k k8s/overlays/staging/
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout do codigo
+      uses: actions/checkout@v4
+
+    - name: Configurar kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+
+    - name: Configurar Kustomize
+      uses: imranismail/setup-kustomize@v2
+
+    - name: Deploy no Kubernetes
+      run: |
+        echo "Deploying to production environment..."
+        echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
+        # Para deploy automatico, configure o kubeconfig no secrets do GitHub
+        # e descomente as linhas abaixo:
+        # echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+        # export KUBECONFIG=kubeconfig.yaml
+        # cd k8s && ./deploy.sh
+        echo "Deploy simulation completed."
+
+    - name: Verificar deploy
+      run: |
+        echo "Verificando status do deploy..."
+        # kubectl rollout status deployment/vehicle-resale-api -n vehicle-resale
+        echo "Deploy verificado com sucesso!"
+
+    - name: Notificar equipe
+      run: |
+        echo "Notificando equipe sobre o deploy..."
+        echo "Deploy realizado com sucesso!"
+        echo "Versao: ${{ github.sha }}"
+

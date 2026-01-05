@@ -1,6 +1,65 @@
 version: '3.8'
 
 services:
+  # ============================================
+  # SERVICO DE AUTENTICACAO SEPARADO (KEYCLOAK)
+  # Responsavel por registro e autorizacao de compradores
+  # Totalmente apartado do resto da solucao
+  # ============================================
+  keycloak-postgres:
+    image: postgres:15-alpine
+    container_name: keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak123
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    networks:
+      - auth-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.3
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak123
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HTTP_PORT: 8180
+      TZ: ${TZ:-America/Sao_Paulo}
+    command: start-dev --import-realm
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - auth-network
+      - vehicle-resale-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8180/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ============================================
+  # BANCO DE DADOS DA APLICACAO (TRANSACIONAL)
+  # Dados de veiculos e vendas - separado do auth
+  # ============================================
   postgres:
     image: postgres:15-alpine
     container_name: ${POSTGRES_CONTAINER_NAME:-vehicle-resale-postgres}
@@ -22,6 +81,10 @@ services:
       timeout: 5s
       retries: 5
 
+  # ============================================
+  # API DE REVENDA DE VEICULOS
+  # Protegida por JWT do Keycloak
+  # ============================================
   vehicle-resale-api:
     build:
       context: .
@@ -36,13 +99,19 @@ services:
       QUARKUS_HIBERNATE_ORM_LOG_SQL: ${QUARKUS_HIBERNATE_ORM_LOG_SQL:-true}
       QUARKUS_LOG_LEVEL: ${QUARKUS_LOG_LEVEL:-INFO}
       QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL: ${QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL:-DEBUG}
+      # Configuracoes OIDC/Keycloak
+      QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak:8180/realms/vehicle-resale
+      QUARKUS_OIDC_CLIENT_ID: vehicle-resale-api
+      QUARKUS_OIDC_CREDENTIALS_SECRET: vehicle-resale-secret
       ENVIRONMENT: ${ENVIRONMENT:-dev}
       TZ: ${TZ:-America/Sao_Paulo}
     ports:
-      - "${APP_PORT:-8082}:${QUARKUS_HTTP_PORT:-8082}"
+      - "8082:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     networks:
       - vehicle-resale-network
     healthcheck:
@@ -55,8 +124,11 @@ services:
 volumes:
   postgres-data:
     driver: local
+  keycloak-postgres-data:
+    driver: local
 
 networks:
   vehicle-resale-network:
     driver: bridge
-
+  auth-network:
+    driver: bridge

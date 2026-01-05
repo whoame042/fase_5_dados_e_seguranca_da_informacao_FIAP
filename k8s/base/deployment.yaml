@@ -6,7 +6,7 @@ metadata:
   labels:
     app: vehicle-resale-api
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: vehicle-resale-api
@@ -64,13 +64,29 @@ spec:
             configMapKeyRef:
               name: vehicle-resale-config
               key: QUARKUS_LOG_CATEGORY_COM_VEHICLERESALE_LEVEL
+        # OIDC/Keycloak Configuration
+        - name: QUARKUS_OIDC_AUTH_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_OIDC_AUTH_SERVER_URL
+        - name: QUARKUS_OIDC_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: vehicle-resale-config
+              key: QUARKUS_OIDC_CLIENT_ID
+        - name: QUARKUS_OIDC_CREDENTIALS_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: vehicle-resale-secret
+              key: QUARKUS_OIDC_CREDENTIALS_SECRET
         resources:
           requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
             memory: "512Mi"
             cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /health/live
@@ -87,4 +103,3 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
-

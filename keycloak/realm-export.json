@@ -1,0 +1,230 @@
+{
+  "realm": "vehicle-resale",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "accessTokenLifespan": 3600,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrador do sistema - pode gerenciar veiculos e ver todas as vendas",
+        "composite": false
+      },
+      {
+        "name": "buyer",
+        "description": "Comprador - pode visualizar veiculos e realizar compras",
+        "composite": false
+      }
+    ],
+    "client": {
+      "vehicle-resale-api": [
+        {
+          "name": "manage_vehicles",
+          "description": "Permite gerenciar veiculos (criar, editar, excluir)"
+        },
+        {
+          "name": "view_vehicles",
+          "description": "Permite visualizar veiculos"
+        },
+        {
+          "name": "purchase_vehicle",
+          "description": "Permite realizar compra de veiculos"
+        },
+        {
+          "name": "view_sales",
+          "description": "Permite visualizar vendas"
+        }
+      ]
+    }
+  },
+  "users": [
+    {
+      "username": "admin@vehicleresale.com",
+      "email": "admin@vehicleresale.com",
+      "firstName": "Admin",
+      "lastName": "Sistema",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"],
+      "clientRoles": {
+        "vehicle-resale-api": ["manage_vehicles", "view_vehicles", "purchase_vehicle", "view_sales"]
+      },
+      "attributes": {
+        "cpf": ["00000000000"]
+      }
+    },
+    {
+      "username": "comprador@teste.com",
+      "email": "comprador@teste.com",
+      "firstName": "Comprador",
+      "lastName": "Teste",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "comprador123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["buyer"],
+      "clientRoles": {
+        "vehicle-resale-api": ["view_vehicles", "purchase_vehicle"]
+      },
+      "attributes": {
+        "cpf": ["12345678901"]
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "vehicle-resale-api",
+      "name": "Vehicle Resale API",
+      "description": "API de Revenda de Veiculos",
+      "rootUrl": "http://localhost:8082",
+      "adminUrl": "http://localhost:8082",
+      "baseUrl": "http://localhost:8082",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "vehicle-resale-secret",
+      "redirectUris": [
+        "http://localhost:8082/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8082",
+        "http://localhost:3000",
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600"
+      },
+      "protocolMappers": [
+        {
+          "name": "cpf-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "cpf",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "cpf",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "realm-roles-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_roles",
+            "jsonType.label": "String"
+          }
+        }
+      ],
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "vehicle-resale-frontend",
+      "name": "Vehicle Resale Frontend",
+      "description": "Frontend da aplicacao de revenda de veiculos",
+      "rootUrl": "http://localhost:3000",
+      "adminUrl": "http://localhost:3000",
+      "baseUrl": "http://localhost:3000",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600"
+      },
+      "protocolMappers": [
+        {
+          "name": "cpf-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "cpf",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "cpf",
+            "jsonType.label": "String"
+          }
+        }
+      ],
+      "fullScopeAllowed": true
+    }
+  ],
+  "requiredCredentials": ["password"],
+  "passwordPolicy": "length(8)",
+  "smtpServer": {}
+}

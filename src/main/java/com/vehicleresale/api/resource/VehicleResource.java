@@ -5,6 +5,8 @@ import com.vehicleresale.api.dto.VehicleFilterDTO;
 import com.vehicleresale.api.dto.VehicleRequestDTO;
 import com.vehicleresale.api.dto.VehicleResponseDTO;
 import com.vehicleresale.application.controller.VehicleController;
+import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
@@ -15,18 +17,23 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
  * REST Adapter - Camada de Interface com HTTP.
  * 
  * Responsabilidades:
- * - Mapear requisições HTTP para chamadas do Controller Clean
+ * - Mapear requisicoes HTTP para chamadas do Controller Clean
  * - Tratar status HTTP (200, 201, 404, etc.)
  * - Validar dados de entrada (@Valid)
  * - Documentar API (OpenAPI/Swagger)
- * - NÃO conter lógica de negócio
+ * - NAO conter logica de negocio
  * - Delegar tudo para o Controller Clean Architecture
+ * 
+ * Seguranca:
+ * - Listagens publicas (GET) - qualquer um pode visualizar veiculos
+ * - Gestao (POST/PUT/DELETE) - apenas admin
  */
 @Path("/api/vehicles")
 @Produces(MediaType.APPLICATION_JSON)
@@ -35,7 +42,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class VehicleResource {
 
     /**
-     * Injeta Controller Clean Architecture (não mais Service direto)
+     * Injeta Controller Clean Architecture (nao mais Service direto)
      * Controller orquestra Gateway + Presenter + Use Case
      */
     @Inject
@@ -43,9 +50,10 @@ public class VehicleResource {
 
     @GET
     @Path("/available")
+    @PermitAll
     @Operation(
         summary = "Listar veiculos disponiveis com paginacao e filtros",
-        description = "Lista todos os veiculos disponiveis para venda com paginacao e filtros opcionais, ordenados por preco (do mais barato para o mais caro)"
+        description = "Lista todos os veiculos disponiveis para venda com paginacao e filtros opcionais, ordenados por preco (do mais barato para o mais caro). Endpoint publico."
     )
     @APIResponse(
         responseCode = "200",
@@ -94,9 +102,10 @@ public class VehicleResource {
 
     @GET
     @Path("/sold")
+    @PermitAll
     @Operation(
         summary = "Listar veiculos vendidos com paginacao e filtros",
-        description = "Lista todos os veiculos vendidos com paginacao e filtros opcionais, ordenados por preco (do mais barato para o mais caro)"
+        description = "Lista todos os veiculos vendidos com paginacao e filtros opcionais, ordenados por preco (do mais barato para o mais caro). Endpoint publico."
     )
     @APIResponse(
         responseCode = "200",
@@ -143,9 +152,10 @@ public class VehicleResource {
 
     @GET
     @Path("/{id}")
+    @PermitAll
     @Operation(
         summary = "Buscar veiculo por ID",
-        description = "Retorna os detalhes de um veiculo especifico"
+        description = "Retorna os detalhes de um veiculo especifico. Endpoint publico."
     )
     @APIResponse(
         responseCode = "200",
@@ -165,9 +175,11 @@ public class VehicleResource {
     }
 
     @POST
+    @RolesAllowed("admin")
+    @SecurityRequirement(name = "keycloak")
     @Operation(
         summary = "Cadastrar novo veiculo",
-        description = "Cadastra um novo veiculo para venda"
+        description = "Cadastra um novo veiculo para venda. Requer autenticacao de administrador."
     )
     @APIResponse(
         responseCode = "201",
@@ -178,6 +190,14 @@ public class VehicleResource {
         responseCode = "400",
         description = "Dados invalidos"
     )
+    @APIResponse(
+        responseCode = "401",
+        description = "Nao autenticado"
+    )
+    @APIResponse(
+        responseCode = "403",
+        description = "Acesso negado - requer role admin"
+    )
     public Response createVehicle(@Valid VehicleRequestDTO request) {
         // Delega para Controller Clean
         VehicleResponseDTO vehicle = vehicleController.createVehicle(request);
@@ -186,9 +206,11 @@ public class VehicleResource {
 
     @PUT
     @Path("/{id}")
+    @RolesAllowed("admin")
+    @SecurityRequirement(name = "keycloak")
     @Operation(
         summary = "Atualizar veiculo",
-        description = "Atualiza os dados de um veiculo existente"
+        description = "Atualiza os dados de um veiculo existente. Requer autenticacao de administrador."
     )
     @APIResponse(
         responseCode = "200",
@@ -203,6 +225,14 @@ public class VehicleResource {
         responseCode = "400",
         description = "Dados invalidos ou veiculo ja vendido"
     )
+    @APIResponse(
+        responseCode = "401",
+        description = "Nao autenticado"
+    )
+    @APIResponse(
+        responseCode = "403",
+        description = "Acesso negado - requer role admin"
+    )
     public Response updateVehicle(
             @Parameter(description = "ID do veiculo", required = true)
             @PathParam("id") Long id,
@@ -214,9 +244,11 @@ public class VehicleResource {
 
     @DELETE
     @Path("/{id}")
+    @RolesAllowed("admin")
+    @SecurityRequirement(name = "keycloak")
     @Operation(
         summary = "Excluir veiculo (soft delete)",
-        description = "Exclui logicamente um veiculo do sistema (soft delete)"
+        description = "Exclui logicamente um veiculo do sistema (soft delete). Requer autenticacao de administrador."
     )
     @APIResponse(
         responseCode = "204",
@@ -229,6 +261,14 @@ public class VehicleResource {
     @APIResponse(
         responseCode = "400",
         description = "Nao e possivel excluir veiculo ja vendido"
+    )
+    @APIResponse(
+        responseCode = "401",
+        description = "Nao autenticado"
+    )
+    @APIResponse(
+        responseCode = "403",
+        description = "Acesso negado - requer role admin"
     )
     public Response deleteVehicle(
             @Parameter(description = "ID do veiculo", required = true)

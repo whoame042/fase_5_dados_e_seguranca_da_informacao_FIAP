@@ -1,6 +1,9 @@
 package com.vehicleresale.domain.service;
 
 import com.vehicleresale.api.dto.SaleRequestDTO;
+import com.vehicleresale.application.controller.VehicleController;
+import com.vehicleresale.application.gateway.VehicleGateway;
+import com.vehicleresale.domain.entity.Customer;
 import com.vehicleresale.domain.entity.Sale;
 import com.vehicleresale.domain.entity.Vehicle;
 import com.vehicleresale.domain.enums.PaymentStatus;
@@ -31,10 +34,17 @@ class SaleServiceTest {
     SaleRepository saleRepository;
 
     @InjectMock
-    VehicleService vehicleService;
+    VehicleGateway vehicleGateway;
+
+    @InjectMock
+    VehicleController vehicleController;
+
+    @InjectMock
+    CustomerService customerService;
 
     private Vehicle testVehicle;
     private Sale testSale;
+    private Customer testCustomer;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +65,13 @@ class SaleServiceTest {
         testSale.salePrice = new BigDecimal("95000.00");
         testSale.paymentCode = "test-payment-code";
         testSale.paymentStatus = PaymentStatus.PENDING;
+
+        testCustomer = new Customer();
+        testCustomer.id = 1L;
+        testCustomer.name = "João Silva";
+        testCustomer.email = "joao.silva@email.com";
+        testCustomer.cpf = "12345678901";
+        testCustomer.active = true;
     }
 
     @Test
@@ -67,9 +84,10 @@ class SaleServiceTest {
         dto.buyerCpf = "12345678901";
         dto.saleDate = LocalDate.now();
 
-        when(vehicleService.findById(1L)).thenReturn(testVehicle);
-        doNothing().when(vehicleService).markAsSold(1L);
+        when(vehicleGateway.findById(1L)).thenReturn(Optional.of(testVehicle));
+        doNothing().when(vehicleController).markAsSold(1L);
         doNothing().when(saleRepository).persist(any(Sale.class));
+        when(customerService.findByCpfOptional("12345678901")).thenReturn(Optional.of(testCustomer));
 
         // When
         Sale result = saleService.create(dto);
@@ -81,7 +99,8 @@ class SaleServiceTest {
         assertEquals("12345678901", result.buyerCpf);
         assertNotNull(result.paymentCode);
         assertEquals(PaymentStatus.PENDING, result.paymentStatus);
-        verify(vehicleService, times(1)).markAsSold(1L);
+        verify(vehicleGateway, times(1)).findById(1L);
+        verify(vehicleController, times(1)).markAsSold(1L);
         verify(saleRepository, times(1)).persist(any(Sale.class));
     }
 
