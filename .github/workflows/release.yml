@@ -249,8 +249,10 @@ jobs:
           echo "🔖 GitHub Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.validate-version.outputs.version }}"
 
       - name: Create Slack notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        if: env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.24.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
