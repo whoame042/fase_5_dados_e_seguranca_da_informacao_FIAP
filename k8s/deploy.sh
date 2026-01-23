@@ -19,10 +19,20 @@ fi
 
 # Aplicar recursos usando kustomize
 echo "📦 Aplicando recursos do Kubernetes..."
+
+# Determinar o diretório correto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$SCRIPT_DIR/base"
+
+if [ ! -d "$BASE_DIR" ]; then
+    echo "❌ Erro: Diretório base/ não encontrado em $SCRIPT_DIR"
+    exit 1
+fi
+
 if command -v kustomize &> /dev/null; then
-    kustomize build base/ | kubectl apply -f -
+    kustomize build "$BASE_DIR" | kubectl apply -f -
 else
-    kubectl apply -k base/
+    kubectl apply -k "$BASE_DIR"
 fi
 
 echo ""

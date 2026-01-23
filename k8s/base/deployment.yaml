@@ -17,10 +17,10 @@ spec:
     spec:
       containers:
       - name: vehicle-resale-api
-        image: vehicle-resale-api:1.0.0
-        imagePullPolicy: IfNotPresent
+        image: vehicle-resale-api:1.0.1
+        imagePullPolicy: Never
         ports:
-        - containerPort: 8082
+        - containerPort: 8080
           name: http
           protocol: TCP
         env:

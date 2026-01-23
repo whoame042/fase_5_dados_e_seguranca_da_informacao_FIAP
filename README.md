@@ -185,14 +185,43 @@ docker-compose ps
 
 ### 4. Executar a aplicacao em modo desenvolvimento
 
+**Opção 1: Usando o script automatizado (recomendado)**
+```bash
+./dev-mode.sh
+```
+
+**Opção 2: Usando Maven diretamente**
 ```bash
 ./mvnw quarkus:dev
+```
+
+**Opção 3: Usando o script maven-build.sh**
+```bash
+./maven-build.sh quarkus:dev
 ```
 
 A aplicacao estara disponivel em:
 - **API**: http://localhost:8082
 - **Swagger UI**: http://localhost:8082/swagger-ui
 - **Keycloak Console**: http://localhost:8180
+
+### Comandos Maven Comuns
+
+| Comando | Descrição |
+|---------|-----------|
+| `./mvnw clean compile` | Limpa e compila o projeto |
+| `./mvnw clean package` | Compila e empacota o projeto (gera JAR) |
+| `./mvnw clean install` | Compila, empacota e instala no repositório local |
+| `./mvnw quarkus:dev` | Inicia em modo desenvolvimento (hot reload) |
+| `./mvnw test` | Executa testes unitários |
+| `./mvnw verify` | Executa testes e validações |
+| `./mvnw clean package -DskipTests` | Build sem executar testes |
+
+**Usando scripts auxiliares:**
+- `./dev-mode.sh` - Inicia em modo desenvolvimento (configura Java/Maven automaticamente)
+- `./maven-build.sh <goal>` - Executa Maven com configuração correta de Java/Maven
+- `./build-and-deploy.sh` - Build completo e deploy
+- `./run-tests.sh` - Executa todos os testes
 
 ## Autenticacao (Keycloak)
 
@@ -414,30 +443,84 @@ O projeto possui pipelines automatizados com GitHub Actions:
 
 ## Deploy com Kubernetes
 
-### Deploy Local (Minikube)
+### Deploy Local (Minikube) - Modo Automatico ✅
+
+Use o script automatizado (recomendado):
 
 ```bash
-# Iniciar Minikube
-minikube start
-
-# Build da imagem
-./mvnw clean package -DskipTests
-docker build -t vehicle-resale-api:1.0.0 .
-
-# Carregar imagem no Minikube
-minikube image load vehicle-resale-api:1.0.0
-
-# Deploy
-cd k8s
-./deploy.sh
+./deploy-minikube-auto.sh
 ```
+
+Este script faz:
+- ✅ Verifica e inicia o Minikube
+- ✅ Compila a aplicacao
+- ✅ Cria a imagem Docker
+- ✅ Aplica recursos do Kubernetes
+- ✅ Aguarda todos os pods ficarem prontos
+- ✅ Mostra instrucoes de acesso
+
+**Tempo estimado:** 5-10 minutos (primeira vez)
+
+### Deploy Manual (Minikube)
+
+Se preferir fazer passo a passo:
+
+```bash
+# 1. Iniciar Minikube
+minikube start --driver=docker --memory=4096 --cpus=2
+
+# 2. Configurar Docker do Minikube
+eval $(minikube docker-env)
+
+# 3. Build da aplicacao
+./mvnw clean package -DskipTests
+./mvnw quarkus:build -DskipTests
+
+# 4. Build da imagem Docker
+docker build -t vehicle-resale-api:1.0.1 .
+
+# 5. Criar ConfigMap do Keycloak
+kubectl create configmap keycloak-realm-config \
+  --from-file=realm-export.json=keycloak/realm-export.json \
+  -n vehicle-resale
+
+# 6. Deploy dos recursos
+cd k8s
+kubectl apply -k .
+cd ..
+
+# 7. Aguardar pods
+kubectl wait --for=condition=ready pod -l app=vehicle-resale-api -n vehicle-resale --timeout=120s
+```
+
+### Acessar a Aplicacao no Kubernetes
+
+**Terminal 1 - API:**
+```bash
+kubectl port-forward -n vehicle-resale svc/vehicle-resale-api-service 8082:80
+```
+Acesse: http://localhost:8082/swagger-ui
+
+**Terminal 2 - Keycloak:**
+```bash
+kubectl port-forward -n vehicle-resale svc/keycloak-service 8180:8180
+```
+Acesse: http://localhost:8180 (admin/admin123)
+
+**Ver Status:**
+```bash
+kubectl get all -n vehicle-resale
+kubectl logs -f -l app=vehicle-resale-api -n vehicle-resale
+```
+
+📖 Documentacao completa: `ACESSO_KUBERNETES.md`
 
 ### Deploy em Cloud
 
 Consulte os overlays disponiveis em `k8s/overlays/` para:
-- AWS
-- Azure
-- GCP
+- AWS (EKS)
+- Azure (AKS)
+- GCP (GKE)
 
 ## Troubleshooting
 
