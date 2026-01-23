@@ -1,0 +1,59 @@
+####
+# Multi-stage Dockerfile para Vehicle Resale API
+# Este Dockerfile compila a aplicação dentro do container
+####
+
+# ============================================================================
+# Stage 1: Build
+# ============================================================================
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
+
+WORKDIR /app
+
+# Copiar arquivos de configuração do Maven
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
+
+# Baixar dependências (cache layer)
+RUN mvn dependency:go-offline -B
+
+# Copiar código fonte
+COPY src ./src
+
+# Build da aplicação com Quarkus
+# O plugin Quarkus precisa ser executado explicitamente
+RUN mvn clean package -DskipTests -B && \
+    ls -la /app/target/quarkus-app/ || \
+    (echo "quarkus-app não gerado, tentando quarkus:build..." && \
+     mvn quarkus:build -DskipTests -B)
+
+# ============================================================================
+# Stage 2: Runtime
+# ============================================================================
+FROM registry.access.redhat.com/ubi8/openjdk-17-runtime:1.18
+
+ENV LANGUAGE='en_US:en'
+ENV QUARKUS_HTTP_PORT=8082
+
+# Configura o diretório de trabalho
+WORKDIR /work/
+
+# Copia o artefato do stage de build
+COPY --from=build --chown=185:0 /app/target/quarkus-app/lib/ /work/lib/
+COPY --from=build --chown=185:0 /app/target/quarkus-app/*.jar /work/
+COPY --from=build --chown=185:0 /app/target/quarkus-app/app/ /work/app/
+COPY --from=build --chown=185:0 /app/target/quarkus-app/quarkus/ /work/quarkus/
+
+# Expõe a porta
+EXPOSE 8082
+
+# Define o usuário não-root
+USER 185
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8082/health/live || exit 1
+
+# Comando para iniciar a aplicação
+CMD ["java", "-jar", "/work/quarkus-run.jar"]

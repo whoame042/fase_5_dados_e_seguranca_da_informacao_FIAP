@@ -1,14 +1,29 @@
-name: CD - Build and Deploy
+name: CD - Continuous Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     tags:
-      - 'v*'
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version tag'
+        required: true
+        default: 'latest'
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  JAVA_VERSION: '17'
 
 jobs:
   build-and-push:
@@ -17,113 +32,245 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-
+      version: ${{ steps.meta.outputs.version }}
+      tags: ${{ steps.meta.outputs.tags }}
+    
     steps:
-    - name: Checkout do codigo
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configurar JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
 
-    - name: Build com Maven
-      run: ./mvnw -B package -DskipTests
+      - name: Build application
+        run: |
+          chmod +x ./mvnw
+          ./mvnw clean package -DskipTests -B
 
-    - name: Configurar Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login no Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extrair metadata da imagem
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=sha,prefix=,suffix=,format=short
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-    - name: Build e Push da imagem Docker
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.multistage
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   deploy-staging:
     name: Deploy to Staging
-    needs: build-and-push
     runs-on: ubuntu-latest
-    environment: staging
-    if: github.ref == 'refs/heads/develop'
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.vehicle-resale.example.com
     
     steps:
-    - name: Checkout do codigo
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Deploy no ambiente de staging
-      run: |
-        echo "Deploying to staging environment..."
-        echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
-        # Aqui seria adicionado o comando de deploy para staging
-        # Por exemplo: kubectl apply -k k8s/overlays/staging/
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure Kubernetes context
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Update image tag in Kubernetes manifests
+        run: |
+          cd k8s/base
+          sed -i "s|image: vehicle-resale-api:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.version }}|g" deployment.yaml
+          sed -i "s|imagePullPolicy: Never|imagePullPolicy: Always|g" deployment.yaml
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace vehicle-resale --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create Keycloak realm ConfigMap
+        run: |
+          kubectl create configmap keycloak-realm-config \
+            --from-file=realm-export.json=keycloak/realm-export.json \
+            -n vehicle-resale \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to Kubernetes
+        run: |
+          cd k8s/base
+          kubectl apply -k . -n vehicle-resale
+
+      - name: Wait for deployment to complete
+        run: |
+          kubectl rollout status deployment/vehicle-resale-api -n vehicle-resale --timeout=5m
+          kubectl rollout status deployment/keycloak -n vehicle-resale --timeout=5m
+
+      - name: Run smoke tests
+        run: |
+          # Aguardar pods ficarem prontos
+          kubectl wait --for=condition=ready pod -l app=vehicle-resale-api -n vehicle-resale --timeout=300s
+          
+          # Obter URL do serviço
+          API_URL=$(kubectl get svc vehicle-resale-api-service -n vehicle-resale -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          # Teste de health check
+          curl -f http://${API_URL}/health/live || exit 1
+          curl -f http://${API_URL}/health/ready || exit 1
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Deployment to STAGING successful!"
+          echo "Version: ${{ needs.build-and-push.outputs.version }}"
+          echo "Environment: staging"
 
   deploy-production:
     name: Deploy to Production
-    needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    needs: [build-and-push, deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://vehicle-resale.example.com
     
     steps:
-    - name: Checkout do codigo
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configurar kubectl
-      uses: azure/setup-kubectl@v4
-      with:
-        version: 'v1.28.0'
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
 
-    - name: Configurar Kustomize
-      uses: imranismail/setup-kustomize@v2
+      - name: Configure Kubernetes context
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
-    - name: Deploy no Kubernetes
-      run: |
-        echo "Deploying to production environment..."
-        echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
-        # Para deploy automatico, configure o kubeconfig no secrets do GitHub
-        # e descomente as linhas abaixo:
-        # echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
-        # export KUBECONFIG=kubeconfig.yaml
-        # cd k8s && ./deploy.sh
-        echo "Deploy simulation completed."
+      - name: Update image tag in Kubernetes manifests
+        run: |
+          cd k8s/base
+          sed -i "s|image: vehicle-resale-api:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.version }}|g" deployment.yaml
+          sed -i "s|imagePullPolicy: Never|imagePullPolicy: Always|g" deployment.yaml
 
-    - name: Verificar deploy
-      run: |
-        echo "Verificando status do deploy..."
-        # kubectl rollout status deployment/vehicle-resale-api -n vehicle-resale
-        echo "Deploy verificado com sucesso!"
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace vehicle-resale --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Notificar equipe
-      run: |
-        echo "Notificando equipe sobre o deploy..."
-        echo "Deploy realizado com sucesso!"
-        echo "Versao: ${{ github.sha }}"
+      - name: Create Keycloak realm ConfigMap
+        run: |
+          kubectl create configmap keycloak-realm-config \
+            --from-file=realm-export.json=keycloak/realm-export.json \
+            -n vehicle-resale \
+            --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Deploy to Kubernetes
+        run: |
+          cd k8s/base
+          kubectl apply -k . -n vehicle-resale
+
+      - name: Wait for deployment to complete
+        run: |
+          kubectl rollout status deployment/vehicle-resale-api -n vehicle-resale --timeout=10m
+          kubectl rollout status deployment/keycloak -n vehicle-resale --timeout=10m
+
+      - name: Run production smoke tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app=vehicle-resale-api -n vehicle-resale --timeout=300s
+          
+          API_URL=$(kubectl get svc vehicle-resale-api-service -n vehicle-resale -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          curl -f http://${API_URL}/health/live || exit 1
+          curl -f http://${API_URL}/health/ready || exit 1
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "🚀 Deployment to PRODUCTION successful!"
+          echo "Version: ${{ needs.build-and-push.outputs.version }}"
+          echo "Environment: production"
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [deploy-staging, deploy-production]
+    
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure Kubernetes context
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+
+      - name: Rollback deployment
+        run: |
+          kubectl rollout undo deployment/vehicle-resale-api -n vehicle-resale
+          kubectl rollout status deployment/vehicle-resale-api -n vehicle-resale
+
+      - name: Notify rollback
+        run: |
+          echo "⚠️ Deployment failed. Rollback executed."

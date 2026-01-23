@@ -1,0 +1,86 @@
+version: 2
+
+updates:
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "maintainers"
+    assignees:
+      - "maintainers"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # Maven dependencies updates
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "maintainers"
+    assignees:
+      - "maintainers"
+    labels:
+      - "dependencies"
+      - "java"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Agrupar atualizações de pacotes relacionados
+    groups:
+      quarkus:
+        patterns:
+          - "io.quarkus*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "*junit*"
+          - "*mockito*"
+          - "*rest-assured*"
+        update-types:
+          - "minor"
+          - "patch"
+      hibernate:
+        patterns:
+          - "org.hibernate*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignorar versões específicas se necessário
+    ignore:
+      # Exemplo: Ignorar atualizações maiores de determinadas dependências
+      - dependency-name: "io.quarkus.*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker base image updates
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "maintainers"
+    assignees:
+      - "maintainers"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"

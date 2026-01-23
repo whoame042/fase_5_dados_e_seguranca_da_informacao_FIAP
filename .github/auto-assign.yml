@@ -1,0 +1,65 @@
+# Configuração de auto-assign para Pull Requests
+# Atribui automaticamente revisores quando um PR é aberto
+
+# Lista de revisores disponíveis
+reviewers:
+  - maintainers
+  - tech-leads
+
+# Número de revisores a serem atribuídos automaticamente
+numberOfReviewers: 1
+
+# Lista de assignees (pessoas responsáveis pelo PR)
+assignees:
+  - author  # O autor do PR será automaticamente atribuído
+
+# Número de assignees
+numberOfAssignees: 1
+
+# Se deve pular palavras-chave em PRs de draft
+skipDraftPR: true
+
+# Palavras-chave para pular auto-assign
+skipKeywords:
+  - wip
+  - WIP
+  - draft
+
+# Se deve usar o filtro de reviewers
+useReviewGroups: true
+
+# Grupos de revisores por área
+reviewGroups:
+  backend:
+    - java-developers
+    - backend-team
+  frontend:
+    - frontend-team
+  devops:
+    - devops-team
+  security:
+    - security-team
+
+# Filtros baseados em arquivos modificados
+filePathFilters:
+  backend:
+    - 'src/main/java/**'
+    - 'src/test/java/**'
+    - 'pom.xml'
+  
+  devops:
+    - '.github/**'
+    - 'k8s/**'
+    - 'Dockerfile'
+    - 'docker-compose*.yml'
+    - '*.sh'
+  
+  docs:
+    - '*.md'
+    - 'docs/**'
+
+# Se deve adicionar assignees aos reviewers
+addAssignees: true
+
+# Se deve adicionar revisores ao PR
+addReviewers: true

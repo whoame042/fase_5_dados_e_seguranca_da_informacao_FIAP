@@ -3,161 +3,65 @@
 .gitignore
 .gitattributes
 
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
+# CI/CD
+.github
 
 # Documentation
-README.md
-ARCHITECTURE.md
-INSTRUCOES_USO.md
-RESUMO_PROJETO.md
-VALIDACAO_INTEGRIDADE.md
 *.md
+docs/
 
-# IDE - IntelliJ IDEA
-.idea
-*.iws
+# IDE
+.idea/
+.vscode/
 *.iml
 *.ipr
-
-# IDE - Eclipse
+*.iws
 .project
 .classpath
-.settings
-.metadata
+.settings/
 
-# IDE - VSCode
-.vscode
+# Build artifacts (quando usando Dockerfile normal)
+# Descomente se usar Dockerfile.multistage:
+# target/
 
-# Maven wrapper (already in image or not needed)
-.mvn
-mvnw
-mvnw.cmd
-
-# Source code (not needed as we copy only target)
-src/
-pom.xml
-
-# Build artifacts that will be copied separately
-target/maven-status/
-target/maven-archiver/
-target/generated-sources/
-target/generated-test-sources/
-target/test-classes/
-target/surefire-reports/
-target/classes/
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml
 
 # Tests
 src/test/
-*Test.java
-*Tests.java
-
-# Kubernetes
-k8s/
-*.yaml
-*.yml
-deployment.yaml
-service.yaml
-
-# Scripts
-*.sh
-build-and-deploy.sh
-reset-database.sh
-maven-build.sh
-run-tests.sh
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-.travis.yml
-jenkins/
-Jenkinsfile
+**/test-results/
+**/coverage/
 
 # Logs
 *.log
 logs/
 
+# OS
+.DS_Store
+Thumbs.db
+
 # Temporary files
 *.tmp
 *.temp
 *.swp
-*.swo
 *~
-.DS_Store
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-init-data.sql
+# Scripts de desenvolvimento
+*.sh
+!mvnw
 
-# Environment files
-.env
-.env.*
-*.properties
-!application.properties
+# Docker
+docker-compose*.yml
+Dockerfile.multistage
 
-# Node modules (if any)
-node_modules/
-npm-debug.log
-
-# Coverage and test reports
-coverage/
-.nyc_output
-test-results/
-
-# Mac OS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Linux
-*~
-.directory
+# Kubernetes
+k8s/
 
 # Backup files
 *.bak
 *.backup
-*.old
 
-# Cache
-.cache/
-*.cache
-
-# Package files (source distribution)
-*.zip
-*.tar.gz
-*.tgz
-*.rar
-
-# Development tools
-.editorconfig
-.prettierrc
-.eslintrc
-
-# Documentation
-docs/
-*.pdf
-*.doc
-*.docx
-
-# Media files (if not needed in image)
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.ico
-
-# Other unnecessary files for Docker image
-LICENSE
-CHANGELOG.md
-CONTRIBUTING.md
-CODE_OF_CONDUCT.md
+# Data
+*.sql
+data/
