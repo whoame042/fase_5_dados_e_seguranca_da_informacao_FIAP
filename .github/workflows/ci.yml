@@ -110,16 +110,6 @@ jobs:
       - name: Check code coverage threshold
         run: ./mvnw jacoco:check -B
 
-      - name: Package application
-        run: ./mvnw package -DskipTests -B
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vehicle-resale-api-jar
-          path: target/quarkus-app/
-          retention-days: 7
-
   code-quality:
     name: Code Quality Analysis
     runs-on: ubuntu-latest
@@ -149,6 +139,7 @@ jobs:
         if: env.SONAR_TOKEN != ''
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./mvnw verify sonar:sonar \
             -Dsonar.projectKey=vehicle-resale-api \
@@ -156,9 +147,6 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             -DskipTests
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-docker-image:
     name: Build Docker Image
@@ -168,12 +156,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: vehicle-resale-api-jar
-          path: target/quarkus-app/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -195,6 +177,3 @@ jobs:
           name: docker-image
           path: /tmp/vehicle-resale-api.tar
           retention-days: 1
-
-          scan-type: 'image'
-          exit-code: '0'
