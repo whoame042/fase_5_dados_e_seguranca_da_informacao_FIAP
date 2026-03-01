@@ -169,10 +169,13 @@ class SaleServiceTest {
 
     @Test
     void testUpdatePaymentStatus_Rejected() {
-        // Given
+        // Given - pagamento rejeitado deve disparar compensação SAGA (devolver veículo ao estoque)
+        testSale.vehicle = testVehicle;
+        testVehicle.id = 1L;
         when(saleRepository.findByPaymentCode("test-payment-code"))
             .thenReturn(Optional.of(testSale));
         doNothing().when(saleRepository).persist(any(Sale.class));
+        doNothing().when(vehicleController).markAsAvailable(1L);
 
         // When
         Sale result = saleService.updatePaymentStatus("test-payment-code", false);
@@ -180,6 +183,7 @@ class SaleServiceTest {
         // Then
         assertEquals(PaymentStatus.REJECTED, result.paymentStatus);
         verify(saleRepository, times(1)).persist(testSale);
+        verify(vehicleController, times(1)).markAsAvailable(1L);
     }
 
     @Test

@@ -147,5 +147,18 @@ public class VehicleController {
         vehicle.status = VehicleStatus.SOLD;
         gateway.save(vehicle);
     }
+
+    /**
+     * Marca veículo como disponível novamente (compensação SAGA quando pagamento é rejeitado).
+     * Usado pelo SaleService ao processar webhook com paid=false.
+     */
+    @Transactional
+    public void markAsAvailable(Long vehicleId) {
+        Vehicle vehicle = gateway.findById(vehicleId)
+                .orElseThrow(() -> new NotFoundException("Veículo não encontrado com ID: " + vehicleId));
+        
+        vehicle.status = VehicleStatus.AVAILABLE;
+        gateway.save(vehicle);
+    }
 }
 

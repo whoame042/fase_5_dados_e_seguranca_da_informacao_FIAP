@@ -114,6 +114,11 @@ public class SaleService {
         
         sale.paymentStatus = paid ? PaymentStatus.APPROVED : PaymentStatus.REJECTED;
         saleRepository.persist(sale);
+
+        // Compensação SAGA: se pagamento rejeitado, devolver veículo ao estoque (disponível)
+        if (!paid && sale.vehicle != null) {
+            vehicleController.markAsAvailable(sale.vehicle.id);
+        }
         
         return sale;
     }
