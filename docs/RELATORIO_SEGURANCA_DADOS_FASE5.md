@@ -1,84 +1,79 @@
----
-title: "Relatório de Segurança de Dados"
-subtitle: "Vehicle Resale API – Fase 5: Dados e Segurança da Informação"
-author: "PÓS-FIAP – Arquitetura de Software"
-date: "Março/2026"
----
-
 # Relatório de Segurança de Dados
 
-**Projeto:** Vehicle Resale API  
-**Disciplina:** Fase 5 – Dados e Segurança da Informação  
-**Curso:** Pós-Graduação FIAP – Arquitetura de Software  
-**Data:** Fevereiro/2026
+| | |
+|---|---|
+| **Projeto** | Vehicle Resale API |
+| **Disciplina** | Fase 5 – Dados e Segurança da Informação |
+| **Curso** | Pós-Graduação FIAP – Arquitetura de Software |
+| **Data** | Março/2026 |
 
 ---
 
 ## Sumário
 
-1. [Dados Armazenados pela Solução](#1-dados-armazenados-pela-solução)
-2. [Dados Sensíveis e Classificação](#2-dados-sensíveis-e-classificação)
-3. [Políticas de Acesso Implementadas](#3-políticas-de-acesso-implementadas)
-4. [Políticas de Segurança Operacional](#4-políticas-de-segurança-operacional)
-5. [Matriz de Riscos e Mitigações](#5-matriz-de-riscos-e-mitigações)
-6. [Conformidade com a LGPD](#6-conformidade-com-a-lgpd)
-7. [Conclusão](#7-conclusão)
+1. Dados Armazenados pela Solução
+2. Dados Sensíveis e Classificação
+3. Políticas de Acesso Implementadas
+4. Políticas de Segurança Operacional
+5. Riscos Identificados e Mitigações
+6. Conformidade com a LGPD
+7. Conclusão
 
 ---
 
 ## 1. Dados Armazenados pela Solução
 
-A solução utiliza **dois bancos de dados PostgreSQL independentes**, separando dados de identidade (Keycloak) de dados transacionais de negócio (API).
+A solução utiliza **dois bancos de dados PostgreSQL independentes**: um para dados
+de identidade (Keycloak) e outro para dados transacionais de negócio (API).
+Essa separação é intencional e reduz a superfície de exposição de cada banco.
 
-### 1.1 Banco da API — `vehicle_resale_db`
+### 1.1 Banco transacional da API — `vehicle_resale_db`
 
-**Entidade: `vehicles`**
+**Entidade `vehicles` — dados de estoque**
 
-| Campo | Tipo | Sensível |
-|-------|------|----------|
+| Campo | Tipo | Contém dado sensível? |
+|-------|------|-----------------------|
 | id | Long | Não |
-| brand | String | Não |
-| model | String | Não |
+| brand, model, color | String | Não |
 | year | Integer | Não |
-| color | String | Não |
 | price | BigDecimal | Não |
-| status | Enum (AVAILABLE / SOLD) | Não |
-| createdAt / updatedAt / deletedAt | LocalDateTime | Não |
+| status | AVAILABLE / SOLD | Não |
+| createdAt, updatedAt, deletedAt | LocalDateTime | Não |
 
-**Entidade: `customers`**
+**Entidade `customers` — dados do comprador**
 
-| Campo | Tipo | Sensível | Base Legal (LGPD) |
-|-------|------|----------|--------------------|
-| id | Long | Não | — |
-| userId | String | Não | — |
-| name | String | **Sim** | Dado pessoal — Art. 5º, I |
-| email | String | **Sim** | Dado pessoal — Art. 5º, I |
-| cpf | String | **Sim** | Dado pessoal — Art. 5º, I |
-| phone | String | **Sim** | Dado pessoal — Art. 5º, I |
-| address / city / state / zipCode | String | **Sim** | Dado pessoal — Art. 5º, I |
+| Campo | Tipo | Dado sensível | Base legal (LGPD) |
+|-------|------|:-------------:|-------------------|
+| id, userId | Long / String | Não | — |
+| name | String | **Sim** | Art. 5º, I — dado pessoal |
+| email | String | **Sim** | Art. 5º, I — dado pessoal |
+| cpf | String | **Sim** | Art. 5º, I — dado pessoal |
+| phone | String | **Sim** | Art. 5º, I — dado pessoal |
+| address, city, state, zipCode | String | **Sim** | Art. 5º, I — dado pessoal |
 | active | Boolean | Não | — |
-| createdAt / updatedAt | LocalDateTime | Não | — |
+| createdAt, updatedAt | LocalDateTime | Não | — |
 
-**Entidade: `sales`**
+**Entidade `sales` — dados da transação de venda**
 
-| Campo | Tipo | Sensível | Observação |
-|-------|------|----------|------------|
-| id | Long | Não | — |
-| vehicle_id | Long (FK) | Não | Referência ao veículo |
+| Campo | Tipo | Dado sensível | Observação |
+|-------|------|:-------------:|------------|
+| id, vehicle_id | Long | Não | — |
 | buyerName | String | **Sim** | Replicado de `Customer.name` |
 | buyerEmail | String | **Sim** | Replicado de `Customer.email` |
 | buyerCpf | String | **Sim** | Replicado de `Customer.cpf` |
-| saleDate | LocalDate | Não | — |
-| salePrice | BigDecimal | Não | — |
+| saleDate, salePrice | Date / Decimal | Não | — |
 | paymentCode | UUID | Parcial | Confidencialidade operacional |
-| paymentStatus | Enum (PENDING / APPROVED / REJECTED) | Não | — |
-| createdAt / updatedAt | LocalDateTime | Não | — |
+| paymentStatus | PENDING/APPROVED/REJECTED | Não | — |
+| createdAt, updatedAt | LocalDateTime | Não | — |
 
-### 1.2 Banco do Keycloak — `keycloak_db`
+### 1.2 Banco de identidade — `keycloak_db`
 
-Gerenciado exclusivamente pelo **Keycloak 23**. Armazena: usuários, credenciais (hash bcrypt), roles (`admin`, `buyer`) e tokens de sessão.
+Gerenciado exclusivamente pelo **Keycloak 23**. Armazena: usuários,
+credenciais (hash bcrypt), roles (`admin`, `buyer`) e tokens de sessão.
 
-> **Importante:** o Keycloak **não armazena** CPF, endereço nem dados financeiros da aplicação. A separação é intencional e garante isolamento entre identidade e dados de negócio.
+**Importante:** o Keycloak **não armazena** CPF, endereço nem dados financeiros
+da aplicação. Qualquer comprometimento do banco de identidade não expõe
+dados pessoais de negócio.
 
 ---
 
@@ -86,24 +81,35 @@ Gerenciado exclusivamente pelo **Keycloak 23**. Armazena: usuários, credenciais
 
 ### 2.1 Mapa de dados sensíveis
 
-| Dado | Onde está armazenado | Finalidade | Classificação |
-|------|----------------------|------------|---------------|
-| **CPF** | `Customer.cpf`, `Sale.buyerCpf` | Identificação e emissão de documentação | Dado pessoal (LGPD) |
-| **Nome completo** | `Customer.name`, `Sale.buyerName` | Identificação e documentação na retirada | Dado pessoal (LGPD) |
-| **E-mail** | `Customer.email`, `Sale.buyerEmail` | Contato e comunicação | Dado pessoal (LGPD) |
-| **Telefone** | `Customer.phone` | Contato | Dado pessoal (LGPD) |
-| **Endereço** | `Customer.address/city/state/zipCode` | Documentação e entrega | Dado pessoal (LGPD) |
-| **paymentCode** | `Sale.paymentCode` | Rastreamento da transação | Confidencial operacional |
+| Dado | Armazenado em | Finalidade |
+|------|---------------|------------|
+| CPF | `Customer.cpf` e `Sale.buyerCpf` | Identificação e emissão de documentação na retirada |
+| Nome completo | `Customer.name` e `Sale.buyerName` | Identificação e documentação |
+| E-mail | `Customer.email` e `Sale.buyerEmail` | Contato e comunicação |
+| Telefone | `Customer.phone` | Contato |
+| Endereço completo | `Customer.address/city/state/zipCode` | Documentação e entrega |
+| paymentCode (UUID) | `Sale.paymentCode` | Rastreamento da transação |
+
+Todos os campos marcados como dado pessoal estão sujeitos à LGPD
+(Lei nº 13.709/2018, Art. 5º, I).
 
 ### 2.2 Recomendações para produção
 
-> **Mascaramento em logs:** CPF e e-mail não devem aparecer em texto plano nos logs de aplicação. Recomenda-se uso de filtros de log ou mascaramento (`***.***.***-**`).
+**Mascaramento em logs:** CPF e e-mail não devem aparecer em texto plano nos
+logs de aplicação. Recomenda-se uso de filtros de log ou mascaramento do
+tipo `***.***.***.***-**`.
 
-> **Criptografia em repouso:** Habilitar TDE (*Transparent Data Encryption*) no PostgreSQL em produção — nativo no Amazon RDS com AWS KMS, sem alteração no código da aplicação.
+**Criptografia em repouso:** habilitar TDE (Transparent Data Encryption) no
+PostgreSQL em produção — disponível nativamente no Amazon RDS com AWS KMS,
+sem alteração no código da aplicação.
 
-> **Criptografia em nível de aplicação (opcional):** Para CPF, pode-se aplicar AES-256 antes de persistir, armazenando apenas o valor cifrado no banco. Exige gerenciamento de chaves (ex.: AWS Secrets Manager / KMS).
+**Criptografia em nível de aplicação (opcional):** para CPF, pode-se aplicar
+AES-256 antes de persistir, armazenando apenas o valor cifrado no banco.
+Exige gerenciamento de chaves via AWS Secrets Manager ou KMS.
 
-> **Retenção e exclusão:** Definir política de retenção de dados pessoais conforme Art. 16 da LGPD. Implementar endpoint de exclusão/anonimização de `Customer` quando solicitado pelo titular.
+**Retenção e exclusão:** definir política de retenção conforme Art. 16 da LGPD.
+Implementar endpoint de exclusão ou anonimização de `Customer` quando
+solicitado pelo titular dos dados.
 
 ---
 
@@ -111,54 +117,59 @@ Gerenciado exclusivamente pelo **Keycloak 23**. Armazena: usuários, credenciais
 
 ### 3.1 Modelo de autenticação e autorização
 
-```
-  Usuário/Sistema
-       │
-       ▼
-  [Keycloak 23] ──── emite JWT com roles
-       │
-       ▼
-  [ALB / Ingress] ──── repassa o token
-       │
-       ▼
-  [Vehicle Resale API] ──── valida JWT + aplica políticas por path/role
-       │
-       ├── Público (sem token): listagem de veículos, health, swagger
-       ├── Autenticado (qualquer role): clientes, vendas
-       └── Role admin: criar/editar/excluir veículos
-```
+O acesso à API é controlado em duas camadas:
 
-### 3.2 Matriz de acesso por endpoint
+1. **Autenticação** — realizada pelo **Keycloak 23** via protocolo OAuth2/OIDC.
+   O cliente obtém um token JWT que contém as roles do usuário.
 
-| Grupo de Endpoints | Método | Política | Role necessária |
-|--------------------|--------|----------|-----------------|
-| `/api/vehicles/available` | GET | Público | — |
-| `/api/vehicles/sold` | GET | Público | — |
-| `/api/vehicles/{id}` | GET | Público | — |
-| `/api/vehicles` | POST | Autenticado | `admin` |
-| `/api/vehicles/{id}` | PUT / DELETE | Autenticado | `admin` |
-| `/api/customers` | GET / POST / PUT | Autenticado | `admin` ou `buyer` |
-| `/api/customers/{id}` | GET / PUT | Autenticado | `admin` ou `buyer` |
-| `/api/sales` | POST | Autenticado | `admin` ou `buyer` |
-| `/api/sales/{id}` | GET | Autenticado | `admin` ou `buyer` |
-| `/api/webhook/payment` | POST | Público\* | — |
-| `/health/*`, `/metrics`, `/swagger-ui/*` | GET | Público | — |
+2. **Autorização** — aplicada pela própria API Quarkus. Cada requisição tem o
+   token validado e a permissão verificada por path e método HTTP, conforme
+   configuração em `application.properties`.
 
-> **\* Atenção — webhook:** o endpoint de webhook está atualmente sem autenticação (`permit`). **Em produção, é obrigatório** restringir o acesso por meio de um header secreto compartilhado (ex.: `X-Webhook-Secret`), assinatura HMAC ou whitelist de IPs.
+As roles disponíveis são: `admin` (administrador do sistema) e `buyer`
+(comprador cadastrado).
 
-### 3.3 Configuração na aplicação
+### 3.2 Matriz de controle de acesso por endpoint
 
-As políticas estão definidas em `src/main/resources/application.properties`:
+| Endpoint | Método | Acesso permitido |
+|----------|--------|-----------------|
+| `/api/vehicles/available` | GET | Público (sem token) |
+| `/api/vehicles/sold` | GET | Público (sem token) |
+| `/api/vehicles/{id}` | GET | Público (sem token) |
+| `/api/vehicles` | POST | Autenticado — role `admin` |
+| `/api/vehicles/{id}` | PUT, DELETE | Autenticado — role `admin` |
+| `/api/customers` | GET, POST, PUT | Autenticado — `admin` ou `buyer` |
+| `/api/customers/{id}` | GET, PUT | Autenticado — `admin` ou `buyer` |
+| `/api/sales` | POST | Autenticado — `admin` ou `buyer` |
+| `/api/sales/{id}` | GET | Autenticado — `admin` ou `buyer` |
+| `/api/webhook/payment` | POST | Público* — ver nota abaixo |
+| `/health/*`, `/metrics`, `/swagger-ui/*` | GET | Público (sem token) |
+
+**(*) Atenção — endpoint de webhook:** atualmente sem autenticação. Em produção,
+é obrigatório restringir o acesso por meio de um header secreto compartilhado
+(`X-Webhook-Secret`), assinatura HMAC ou whitelist de IPs do parceiro de
+pagamento.
+
+### 3.3 Configuração de autorização na aplicação
+
+As políticas são definidas em `src/main/resources/application.properties`.
+Trecho principal:
 
 ```properties
-quarkus.http.auth.permission.public.paths=/health/*,/metrics,/openapi,/swagger-ui/*,/q/*
+# Caminhos públicos (sem autenticação)
+quarkus.http.auth.permission.public.paths=\
+  /health/*,/metrics,/openapi,/swagger-ui/*,/q/*
 quarkus.http.auth.permission.public.policy=permit
 
-quarkus.http.auth.permission.vehicles-admin.paths=/api/vehicles,/api/vehicles/*
+# Gestão de veículos — apenas role admin
+quarkus.http.auth.permission.vehicles-admin.paths=\
+  /api/vehicles,/api/vehicles/*
 quarkus.http.auth.permission.vehicles-admin.methods=POST,PUT,DELETE
 quarkus.http.auth.policy.vehicles-admin.roles-allowed=admin
 
-quarkus.http.auth.permission.customers.paths=/api/customers,/api/customers/*
+# Clientes e vendas — qualquer usuário autenticado
+quarkus.http.auth.permission.customers.paths=\
+  /api/customers,/api/customers/*
 quarkus.http.auth.permission.customers.policy=authenticated
 ```
 
@@ -170,89 +181,118 @@ quarkus.http.auth.permission.customers.policy=authenticated
 
 | Camada | Responsabilidade | Tecnologia |
 |--------|-----------------|------------|
-| Identidade e acesso | Autenticação, emissão de tokens, gestão de usuários e roles | Keycloak 23 (serviço separado) |
-| Dados transacionais | Veículos, clientes, vendas | Vehicle Resale API + PostgreSQL |
-| Isolamento de dados | Banco da API separado do banco do Keycloak | Dois containers / instâncias RDS distintas |
+| Identidade | Autenticação, tokens, users, roles | Keycloak 23 |
+| Dados transacionais | Veículos, clientes, vendas | Quarkus API + PostgreSQL |
+| Isolamento de dados | Banco da API separado do Keycloak | Dois containers / instâncias RDS |
 
 ### 4.2 Proteção contra ataques
 
-| Controle | Implementação |
-|----------|---------------|
-| **Brute force** | Keycloak: `bruteForceProtected=true`, `failureFactor`, `maxFailureWaitSeconds` configurados no `realm-export.json` |
-| **Expiração de sessão** | `accessTokenLifespan` e `ssoSessionIdleTimeout` configurados no realm |
-| **Validação de entrada** | Bean Validation (`@NotBlank`, `@Size`, `@Pattern`) em todos os DTOs de requisição |
-| **SQL Injection** | Hibernate/Panache com queries parametrizadas (sem SQL dinâmico manual) |
-| **Usuário não-root** | Container Docker executa com UID 185 (não-root) |
-| **HTTPS/TLS** | Configurável via `quarkus.oidc.tls.*`; em produção, terminação TLS no ALB/Ingress |
+| Controle de segurança | Implementação |
+|-----------------------|---------------|
+| Proteção contra brute force | Keycloak com `bruteForceProtected=true`, `failureFactor` e `maxFailureWaitSeconds` no realm |
+| Expiração de sessão | `accessTokenLifespan` e `ssoSessionIdleTimeout` configurados no realm Keycloak |
+| Validação de entrada | Bean Validation (`@NotBlank`, `@Size`, `@Pattern`) em todos os DTOs |
+| Prevenção de SQL Injection | Hibernate/Panache com queries parametrizadas |
+| Container não-root | Dockerfile executa a aplicação com UID 185 |
+| TLS em trânsito | Configurável via `quarkus.oidc.tls.*`; terminação no ALB/Ingress em produção |
 
 ### 4.3 Monitoramento e auditoria
 
-| Recurso | Configuração |
-|---------|-------------|
-| **Health check** | `GET /health/ready` e `/health/live` (Smallrye Health) |
-| **Métricas** | `GET /metrics` (formato Prometheus) |
-| **Logging** | Nível configurável por pacote em `application.properties`; OIDC com nível DEBUG disponível |
-| **Auditoria AWS** | CloudTrail para ações na infraestrutura; GuardDuty para detecção de anomalias (ambiente de produção) |
+| Recurso | Detalhe |
+|---------|---------|
+| Health check | `GET /health/ready` e `GET /health/live` via Smallrye Health |
+| Métricas | `GET /metrics` em formato Prometheus |
+| Logs de aplicação | Nível configurável por pacote em `application.properties` |
+| Auditoria de infraestrutura | AWS CloudTrail + GuardDuty (ambiente de produção) |
 
 ---
 
-## 5. Matriz de Riscos e Mitigações
+## 5. Riscos Identificados e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação Implementada | Mitigação Recomendada |
-|-------|:-------------:|:-------:|------------------------|----------------------|
-| Acesso não autorizado à API | Média | Alto | Autenticação Keycloak; autorização por path e role | HTTPS obrigatório; revisão periódica de permissões |
-| Exposição de CPF e e-mail em logs | Alta | Alto | — | Mascarar dados sensíveis nos logs; nível INFO em produção |
-| Webhook de pagamento falsificado | Alta | Alto | — | Header secreto (`X-Webhook-Secret`) ou assinatura HMAC; rate limiting |
-| Venda com CPF inválido ou não cadastrado | Baixa | Médio | Validação em `SaleService`; CPF obrigatório no cadastro | Mantida |
-| Veículo bloqueado após pagamento rejeitado | Média | Médio | Compensação SAGA: reverte veículo para `AVAILABLE` | Mantida |
-| Exposição de dados em repouso | Baixa | Alto | — | Criptografia TDE no RDS (KMS); criptografia de CPF em nível de aplicação |
-| Indisponibilidade / perda de dados | Baixa | Alto | — | Backup automatizado (RDS); replicação Multi-AZ; definir RTO/RPO |
-| Acesso direto ao banco de dados | Baixa | Crítico | Banco em rede privada (VPC) | Security Groups restritivos; RDS sem IP público; IAM Authentication |
+### 5.1 Riscos de acesso e autenticação
+
+| Risco | Probabilidade | Impacto | Mitigação implementada |
+|-------|:---:|:---:|------------------------|
+| Acesso não autorizado à API | Média | Alto | Keycloak + autorização por path e role |
+| Webhook de pagamento falsificado | Alta | Alto | Nenhuma (recomendada: header secreto ou HMAC) |
+| Brute force nas credenciais | Média | Alto | Keycloak com bloqueio automático por tentativas |
+
+### 5.2 Riscos de dados sensíveis
+
+| Risco | Probabilidade | Impacto | Mitigação implementada |
+|-------|:---:|:---:|------------------------|
+| CPF e e-mail expostos em logs | Alta | Alto | Nenhuma (recomendada: filtro de log / mascaramento) |
+| Dados em repouso sem criptografia | Média | Alto | Nenhuma (recomendada: TDE no RDS via KMS) |
+| Venda com CPF não cadastrado | Baixa | Médio | Validação no `SaleService` — CPF obrigatório |
+
+### 5.3 Riscos de integridade e disponibilidade
+
+| Risco | Probabilidade | Impacto | Mitigação implementada |
+|-------|:---:|:---:|------------------------|
+| Veículo bloqueado após pagamento falhar | Média | Médio | Compensação SAGA: reverte para AVAILABLE |
+| Acesso direto ao banco de dados | Baixa | Crítico | Banco em VPC privada (recomendada: Security Groups) |
+| Perda de dados / indisponibilidade | Baixa | Alto | Nenhuma (recomendada: RDS Multi-AZ + backup automatizado) |
 
 ---
 
 ## 6. Conformidade com a LGPD
 
-A Lei Geral de Proteção de Dados (Lei nº 13.709/2018) estabelece obrigações para o tratamento de dados pessoais. A tabela abaixo mapeia os principais princípios ao estado atual da solução.
+A Lei Geral de Proteção de Dados (Lei nº 13.709/2018) estabelece obrigações
+para o tratamento de dados pessoais. A tabela abaixo mapeia os principais
+princípios ao estado atual da solução.
 
-| Princípio (Art. 6º) | Situação na solução | Status |
-|---------------------|---------------------|:------:|
-| **Finalidade** | CPF e endereço coletados exclusivamente para emissão de código de pagamento e documentação na retirada | ✅ Atendido |
-| **Adequação** | Dados coletados são compatíveis com a finalidade informada | ✅ Atendido |
-| **Necessidade** | Apenas dados estritamente necessários são armazenados (sem biometria, sem documentos além do CPF) | ✅ Atendido |
-| **Acesso do Titular** | `GET /api/customers/{id}` permite consulta dos próprios dados (autenticado) | ✅ Atendido |
-| **Qualidade dos dados** | `PUT /api/customers/{id}` permite atualização dos dados pelo titular | ✅ Atendido |
-| **Segurança** | Autenticação Keycloak, autorização por role, TLS em trânsito | ⚠️ Parcial — criptografia em repouso pendente |
-| **Prevenção** | Validação de entrada; proteção contra brute force no Keycloak | ⚠️ Parcial — webhook sem autenticação |
-| **Responsabilização** | Logs de acesso; estrutura auditável | ⚠️ Parcial — auditoria completa depende do ambiente de produção (CloudTrail) |
-| **Não discriminação** | Não aplicável ao domínio | — |
+| Princípio (Art. 6º) | Estado na solução | Situação |
+|---------------------|-------------------|:--------:|
+| Finalidade | CPF e endereço coletados para pagamento e retirada | Atendido |
+| Adequação | Dados compatíveis com a finalidade informada | Atendido |
+| Necessidade | Apenas dados estritamente necessários armazenados | Atendido |
+| Acesso do titular | `GET /api/customers/{id}` disponível (autenticado) | Atendido |
+| Qualidade dos dados | `PUT /api/customers/{id}` permite atualização | Atendido |
+| Segurança | Auth Keycloak + autorização + TLS configurável | Parcial |
+| Prevenção | Validação de entrada + brute force no Keycloak | Parcial |
+| Responsabilização | Logs auditáveis; CloudTrail em produção | Parcial |
+| Não discriminação | Não aplicável ao domínio | — |
 
-> **Ações prioritárias para conformidade plena:** (1) autenticar o webhook de pagamento; (2) habilitar criptografia em repouso no banco de produção; (3) implementar endpoint de exclusão/anonimização de dados do titular; (4) documentar o ciclo de vida e a retenção dos dados pessoais.
+**Ações prioritárias para conformidade plena:**
+
+1. Autenticar o endpoint de webhook de pagamento.
+2. Habilitar criptografia em repouso no banco de produção (RDS + KMS).
+3. Implementar endpoint de exclusão ou anonimização dos dados do titular.
+4. Documentar o ciclo de vida e a política de retenção dos dados pessoais.
 
 ---
 
 ## 7. Conclusão
 
-A solução **Vehicle Resale API** implementa os controles fundamentais de segurança de dados:
+A solução **Vehicle Resale API** implementa os controles fundamentais de
+segurança de dados:
 
-- **Autenticação robusta** via Keycloak 23 (OAuth2/OIDC) com proteção contra brute force
-- **Autorização granular** por path e role (`admin` / `buyer`) configurada diretamente no framework
-- **Separação de identidade e dados de negócio** em serviços e bancos independentes
-- **Tratamento de dados sensíveis** (CPF, e-mail, endereço) com acesso restrito a usuários autenticados
-- **Resiliência transacional** via SAGA de compensação, que impede inconsistências no estoque
+- Autenticação robusta via **Keycloak 23** (OAuth2/OIDC) com proteção contra
+  brute force.
+- Autorização granular por path e role (`admin` / `buyer`) configurada no
+  framework Quarkus.
+- Separação entre identidade (Keycloak) e dados de negócio (API) em bancos e
+  serviços independentes.
+- Acesso a dados sensíveis (CPF, e-mail, endereço) restrito a usuários
+  autenticados.
+- Resiliência transacional via SAGA de compensação, evitando inconsistências
+  no estoque de veículos.
 
-| Controle | Status |
-|----------|:------:|
-| Autenticação (Keycloak / OAuth2 / JWT) | ✅ Implementado |
-| Autorização por role e path | ✅ Implementado |
-| Separação identidade × negócio | ✅ Implementado |
-| Validação de entrada (Bean Validation) | ✅ Implementado |
-| Compensação SAGA | ✅ Implementado |
-| Criptografia em trânsito (TLS) | ⚠️ Configurável (ALB/Ingress) |
-| Criptografia em repouso | ⚠️ Recomendada (RDS KMS) |
-| Autenticação do webhook | ⚠️ Pendente |
-| Mascaramento de dados em logs | ⚠️ Recomendado |
+**Status dos controles de segurança:**
+
+| Controle | Situação |
+|----------|----------|
+| Autenticação — Keycloak / OAuth2 / JWT | Implementado |
+| Autorização por role e path | Implementado |
+| Separação identidade vs. dados de negócio | Implementado |
+| Validação de entrada — Bean Validation | Implementado |
+| Compensação SAGA | Implementado |
+| Criptografia em trânsito — TLS | Configurável (ALB/Ingress) |
+| Criptografia em repouso | Recomendada — RDS KMS |
+| Autenticação do webhook | Pendente |
+| Mascaramento de dados sensíveis em logs | Recomendado |
 
 ---
 
-*Documento elaborado para a Fase 5 – Dados e Segurança da Informação – PÓS-FIAP Arquitetura de Software.*
+*Documento elaborado para a Fase 5 – Dados e Segurança da Informação –
+Pós-Graduação FIAP – Arquitetura de Software – Março/2026.*
