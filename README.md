@@ -14,6 +14,7 @@ Sistema de gerenciamento de revenda de veiculos automotores, desenvolvido com Qu
 - [Autenticacao (Keycloak)](#autenticacao-keycloak)
 - [Endpoints da API](#endpoints-da-api)
 - [Fluxo Completo de Uso](#fluxo-completo-de-uso)
+- [Testando a Compensacao SAGA](#testando-a-compensacao-saga)
 - [Testes](#testes)
 - [CI/CD](#cicd)
 - [Deploy com Kubernetes](#deploy-com-kubernetes)
@@ -150,10 +151,16 @@ vehicle-resale-api/
 
 ## Pre-requisitos
 
-- Java 17 ou superior
-- Maven 3.8+
-- Docker e Docker Compose
-- Kubernetes (opcional para deploy)
+| Ferramenta | Versao minima | Observacao |
+|------------|---------------|------------|
+| Java | 17 | Obrigatorio para execucao local sem Docker |
+| Maven | 3.8+ | Ou use o wrapper `./mvnw` incluido no projeto |
+| Docker | 20.10+ | Obrigatorio para o ambiente local completo |
+| Docker Compose | 1.29+ ou v2 | v1: `docker-compose`; v2 (embutido no Docker): `docker compose` |
+| curl | qualquer | Para testar endpoints no terminal |
+| jq | 1.6+ | Para extrair tokens automaticamente nos exemplos (`apt install jq` / `brew install jq`) |
+
+> **Nota sobre Docker Compose v2:** se o comando `docker-compose` nao for encontrado, use `docker compose` (sem hifen), disponivel no Docker Desktop e no Docker Engine 20.10+.
 
 ## Instalacao e Execucao Local
 
@@ -183,6 +190,17 @@ Aguarde os servicos iniciarem (pode levar alguns minutos na primeira vez).
 docker-compose ps
 ```
 
+Todos os servicos devem aparecer como `healthy` ou `Up`. O Keycloak pode levar **1-2 minutos** para ficar pronto na primeira execucao (importa o realm automaticamente).
+
+```bash
+# Aguardar Keycloak ficar saudavel (repita ate retornar {"status":"UP",...})
+curl -s http://localhost:8180/health/ready
+
+# Verificar saude da API (modo dev local ou docker-compose com a API incluida)
+curl -s http://localhost:8082/health/ready
+# Resposta esperada: {"status":"UP","checks":[...]}
+```
+
 ### 4. Executar a aplicacao em modo desenvolvimento
 
 **Opção 1: Usando o script automatizado (recomendado)**
@@ -202,8 +220,12 @@ docker-compose ps
 
 A aplicacao estara disponivel em:
 - **API**: http://localhost:8082
-- **Swagger UI**: http://localhost:8082/swagger-ui
+- **Swagger UI**: http://localhost:8082/swagger-ui (interface grafica para testar todos os endpoints)
+- **OpenAPI JSON**: http://localhost:8082/openapi
+- **Health Check**: http://localhost:8082/health/ready
 - **Keycloak Console**: http://localhost:8180
+
+> **Dica:** O Swagger UI e a forma mais rapida para um novo desenvolvedor explorar e testar todos os endpoints sem precisar escrever comandos curl. Acesse, clique em "Authorize", cole o Bearer token e execute as requisicoes diretamente pelo navegador.
 
 ### Comandos Maven Comuns
 
@@ -225,6 +247,8 @@ A aplicacao estara disponivel em:
 
 ## Autenticacao (Keycloak)
 
+A autenticacao e feita via **OAuth2/OIDC** pelo Keycloak. A API valida o token JWT em cada requisicao protegida. O realm `vehicle-resale` e importado automaticamente na primeira inicializacao do container Keycloak.
+
 ### Acessar Console Administrativo do Keycloak
 
 - URL: http://localhost:8180
@@ -235,36 +259,52 @@ A aplicacao estara disponivel em:
 
 | Usuario | Senha | Role | Descricao |
 |---------|-------|------|-----------|
-| admin@vehicleresale.com | admin123 | admin | Gerencia veiculos e ve todas as vendas |
-| comprador@teste.com | comprador123 | buyer | Visualiza veiculos e realiza compras |
+| admin@vehicleresale.com | admin123 | admin | Cadastra/edita/exclui veiculos; ve todas as vendas e clientes |
+| comprador@teste.com | comprador123 | buyer | Visualiza veiculos, cadastra-se como cliente e realiza compras |
 
-### Obter Token de Acesso
+### Obter Token de Acesso (salvar em variavel de ambiente)
 
 ```bash
 # Token de administrador
-curl -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+ADMIN_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=vehicle-resale-api" \
   -d "client_secret=vehicle-resale-secret" \
   -d "grant_type=password" \
   -d "username=admin@vehicleresale.com" \
-  -d "password=admin123"
+  -d "password=admin123" | jq -r '.access_token')
+
+echo "Admin token: ${ADMIN_TOKEN:0:50}..."   # exibe os primeiros 50 caracteres
 
 # Token de comprador
-curl -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+BUYER_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=vehicle-resale-api" \
   -d "client_secret=vehicle-resale-secret" \
   -d "grant_type=password" \
   -d "username=comprador@teste.com" \
-  -d "password=comprador123"
+  -d "password=comprador123" | jq -r '.access_token')
+
+echo "Buyer token: ${BUYER_TOKEN:0:50}..."
 ```
+
+### Obter o userId do Keycloak (necessario para cadastro de cliente)
+
+O campo `userId` da entidade `Customer` deve ser o ID do usuario no Keycloak. Para obtê-lo a partir do proprio token:
+
+```bash
+# Decodifica o payload do token e extrai o sub (= userId no Keycloak)
+BUYER_USER_ID=$(echo $BUYER_TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq -r '.sub')
+echo "Buyer userId: $BUYER_USER_ID"
+```
+
+> O campo `userId` e opcional no cadastro; se omitido, a API aceita o cadastro sem vinculo explicito ao Keycloak.
 
 ### Usar Token nas Requisicoes
 
 ```bash
 curl -X GET "http://localhost:8082/api/customers/me" \
-  -H "Authorization: Bearer <seu_token_aqui>"
+  -H "Authorization: Bearer $BUYER_TOKEN"
 ```
 
 ## Endpoints da API
@@ -308,49 +348,61 @@ curl -X GET "http://localhost:8082/api/customers/me" \
 
 ## Fluxo Completo de Uso
 
-### 1. Cadastrar um novo usuario no Keycloak
+O fluxo completo envolve **dois perfis**: o **administrador** (gerencia o estoque de veiculos) e o **comprador** (se cadastra e efetua a compra). Execute os passos abaixo em sequencia.
 
-Acesse http://localhost:8180 e crie um novo usuario ou use os usuarios pre-configurados.
-
-### 2. Obter token de acesso
+### Passo 0 — Obter tokens
 
 ```bash
-TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+# Token do administrador (role: admin)
+ADMIN_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=vehicle-resale-api" \
   -d "client_secret=vehicle-resale-secret" \
   -d "grant_type=password" \
   -d "username=admin@vehicleresale.com" \
   -d "password=admin123" | jq -r '.access_token')
+
+# Token do comprador (role: buyer)
+BUYER_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=vehicle-resale-api" \
+  -d "client_secret=vehicle-resale-secret" \
+  -d "grant_type=password" \
+  -d "username=comprador@teste.com" \
+  -d "password=comprador123" | jq -r '.access_token')
 ```
 
-### 3. Cadastrar veiculo (como admin)
+### Passo 1 — Cadastrar veiculo (admin)
 
 ```bash
-curl -X POST "http://localhost:8082/api/vehicles" \
+VEHICLE_ID=$(curl -s -X POST "http://localhost:8082/api/vehicles" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "brand": "Toyota",
     "model": "Corolla",
     "year": 2023,
     "color": "Prata",
     "price": 95000.00
-  }'
+  }' | jq -r '.id')
+
+echo "Veiculo criado com ID: $VEHICLE_ID"
 ```
 
-### 4. Listar veiculos disponiveis
+### Passo 2 — Listar veiculos disponiveis (publico, sem token)
 
 ```bash
-curl -X GET "http://localhost:8082/api/vehicles/available"
+curl -s "http://localhost:8082/api/vehicles/available" | jq '.[] | {id, brand, model, price, status}'
 ```
 
-### 5. Cadastrar cliente (OBRIGATORIO antes da compra)
+### Passo 3 — Cadastrar cliente/comprador (buyer) — OBRIGATORIO antes da compra
+
+> O sistema exige que o comprador esteja cadastrado com CPF valido antes de efetuar qualquer venda.
 
 ```bash
-curl -X POST "http://localhost:8082/api/customers" \
+CUSTOMER_ID=$(curl -s -X POST "http://localhost:8082/api/customers" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $BUYER_TOKEN" \
   -d '{
     "name": "Joao Silva",
     "email": "joao@email.com",
@@ -360,53 +412,136 @@ curl -X POST "http://localhost:8082/api/customers" \
     "city": "Sao Paulo",
     "state": "SP",
     "zipCode": "01234567"
-  }'
+  }' | jq -r '.id')
+
+echo "Cliente cadastrado com ID: $CUSTOMER_ID"
 ```
 
-### 6. Efetuar compra do veiculo
+### Passo 4 — Efetuar a compra do veiculo (buyer)
+
+O sistema valida que o CPF informado na venda esta cadastrado. Ao criar a venda, o veiculo e marcado como `SOLD` e um `paymentCode` e gerado.
 
 ```bash
-curl -X POST "http://localhost:8082/api/sales" \
+PAYMENT_CODE=$(curl -s -X POST "http://localhost:8082/api/sales" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "vehicleId": 1,
-    "buyerName": "Joao Silva",
-    "buyerEmail": "joao@email.com",
-    "buyerCpf": "12345678901",
-    "saleDate": "2024-01-15"
-  }'
+  -H "Authorization: Bearer $BUYER_TOKEN" \
+  -d "{
+    \"vehicleId\": $VEHICLE_ID,
+    \"buyerName\": \"Joao Silva\",
+    \"buyerEmail\": \"joao@email.com\",
+    \"buyerCpf\": \"12345678901\",
+    \"saleDate\": \"$(date +%Y-%m-%d)\"
+  }" | jq -r '.paymentCode')
+
+echo "Codigo de pagamento: $PAYMENT_CODE"
 ```
 
-### 7. Processar pagamento (webhook)
+### Passo 5 — Processar pagamento aprovado (webhook)
 
 ```bash
-curl -X POST "http://localhost:8082/api/webhook/payment" \
+curl -s -X POST "http://localhost:8082/api/webhook/payment" \
   -H "Content-Type: application/json" \
-  -d '{
-    "paymentCode": "<codigo_retornado_na_venda>",
-    "paid": true
-  }'
+  -d "{\"paymentCode\": \"$PAYMENT_CODE\", \"paid\": true}" | jq .
 ```
 
-### 8. Listar veiculos vendidos
+Resultado esperado: `paymentStatus` passa de `PENDING` para `APPROVED`.
+
+### Passo 6 — Confirmar veiculo como vendido (publico)
 
 ```bash
-curl -X GET "http://localhost:8082/api/vehicles/sold"
+curl -s "http://localhost:8082/api/vehicles/sold" | jq '.[] | {id, brand, model, status}'
 ```
+
+## Testando a Compensacao SAGA
+
+O sistema implementa **SAGA de compensacao**: se o pagamento for rejeitado, o veiculo e revertido automaticamente para `AVAILABLE` (liberando o estoque). Este e o cenario de falha do fluxo de compra.
+
+### Cenario: pagamento rejeitado → veiculo volta ao estoque
+
+```bash
+# 1. Cadastrar um novo veiculo para o teste
+VEHICLE2_ID=$(curl -s -X POST "http://localhost:8082/api/vehicles" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"brand":"Honda","model":"Civic","year":2022,"color":"Preto","price":85000.00}' \
+  | jq -r '.id')
+
+echo "Veiculo para teste de rejeicao: $VEHICLE2_ID"
+
+# 2. Confirmar que o veiculo esta AVAILABLE
+curl -s "http://localhost:8082/api/vehicles/$VEHICLE2_ID" | jq '{id, status}'
+
+# 3. Criar a venda (veiculo passa para SOLD)
+PAYMENT_CODE2=$(curl -s -X POST "http://localhost:8082/api/sales" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $BUYER_TOKEN" \
+  -d "{
+    \"vehicleId\": $VEHICLE2_ID,
+    \"buyerName\": \"Joao Silva\",
+    \"buyerEmail\": \"joao@email.com\",
+    \"buyerCpf\": \"12345678901\",
+    \"saleDate\": \"$(date +%Y-%m-%d)\"
+  }" | jq -r '.paymentCode')
+
+echo "Payment code: $PAYMENT_CODE2"
+
+# 4. Confirmar que veiculo esta SOLD apos criacao da venda
+curl -s "http://localhost:8082/api/vehicles/$VEHICLE2_ID" | jq '{id, status}'
+# Esperado: status = "SOLD"
+
+# 5. Simular pagamento REJEITADO (paid: false)
+curl -s -X POST "http://localhost:8082/api/webhook/payment" \
+  -H "Content-Type: application/json" \
+  -d "{\"paymentCode\": \"$PAYMENT_CODE2\", \"paid\": false}" | jq .
+# Esperado: paymentStatus = "REJECTED"
+
+# 6. Verificar compensacao: veiculo deve estar AVAILABLE novamente
+curl -s "http://localhost:8082/api/vehicles/$VEHICLE2_ID" | jq '{id, status}'
+# Esperado: status = "AVAILABLE" (compensacao SAGA executada com sucesso)
+```
+
+> **Como funciona:** `SaleService.updatePaymentStatus()` detecta `paid=false`, persiste `REJECTED` e chama `VehicleController.markAsAvailable()`, revertendo o veículo ao estoque. Ver `docs/RELATORIO_SAGA_FASE5.md` para detalhes completos.
 
 ## Testes
 
-### Executar todos os testes
+### Executar todos os testes unitarios
 
 ```bash
 ./mvnw test
 ```
 
-### Executar testes com cobertura
+### Executar testes com relatorio de cobertura (JaCoCo)
 
 ```bash
 ./mvnw verify
+# Relatorio gerado em: target/site/jacoco/index.html
+```
+
+### Executar testes via script auxiliar
+
+```bash
+./run-tests.sh
+```
+
+### Teste end-to-end (script automatizado)
+
+O projeto inclui um script que executa o fluxo completo de ponta a ponta com curl:
+
+```bash
+./test-e2e.sh
+```
+
+### Estrutura dos testes
+
+```
+src/test/java/com/vehicleresale/
+├── domain/service/
+│   ├── VehicleServiceTest.java    # Testes unitarios do servico de veiculos
+│   ├── CustomerServiceTest.java   # Testes unitarios do servico de clientes
+│   └── SaleServiceTest.java       # Testes unitarios do servico de vendas
+│                                  # (inclui teste da compensacao SAGA)
+└── api/resource/
+    └── ...                        # Testes de integracao dos endpoints REST
 ```
 
 ## CI/CD
@@ -513,7 +648,7 @@ kubectl get all -n vehicle-resale
 kubectl logs -f -l app=vehicle-resale-api -n vehicle-resale
 ```
 
-📖 Documentacao completa: `ACESSO_KUBERNETES.md`
+Para detalhes adicionais sobre acesso e depuracao no Kubernetes, consulte os manifestos em `k8s/`.
 
 ### Deploy em Cloud
 
@@ -524,39 +659,99 @@ Consulte os overlays disponiveis em `k8s/overlays/` para:
 
 ## Troubleshooting
 
-### Keycloak nao inicia
+### Keycloak nao inicia ou fica em loop
 
 ```bash
-# Verificar logs
-docker-compose logs keycloak
+# Ver logs em tempo real
+docker-compose logs -f keycloak
 
-# Reiniciar servicos
+# Aguardar o realm ser importado (normal levar 60-120s na primeira vez)
+# Mensagem de sucesso esperada nos logs: "Realm vehicle-resale imported"
+
+# Se travar, reiniciar apenas o Keycloak
 docker-compose restart keycloak
 ```
 
-### Erro de conexao com banco de dados
+### Erro de conexao com banco de dados (`Connection refused` ou `FATAL`)
 
 ```bash
-# Verificar se PostgreSQL esta rodando
+# Verificar se PostgreSQL da API esta rodando e healthy
 docker-compose ps postgres
 
-# Verificar logs
+# Ver logs do banco
 docker-compose logs postgres
+
+# Verificar porta exposta (padrao: 5433 no host -> 5432 no container)
+# A aplicacao local (./mvnw quarkus:dev) conecta em localhost:5433
+# Dentro do Docker Compose, a API conecta em postgres:5432
 ```
 
-### Token invalido ou expirado
+### Token invalido, expirado ou `401 Unauthorized`
 
-Obtenha um novo token usando o endpoint de autenticacao do Keycloak.
+```bash
+# Tokens expiram apos alguns minutos. Obtenha um novo:
+ADMIN_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/vehicle-resale/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=vehicle-resale-api&client_secret=vehicle-resale-secret&grant_type=password&username=admin@vehicleresale.com&password=admin123" \
+  | jq -r '.access_token')
+```
+
+### Erro `403 Forbidden` em endpoints de veiculos (POST/PUT/DELETE)
+
+Esses endpoints exigem role `admin`. Certifique-se de usar o `ADMIN_TOKEN` (nao o `BUYER_TOKEN`):
+
+```bash
+# Correto: usa token com role admin
+curl -X POST "http://localhost:8082/api/vehicles" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" ...
+```
+
+### Erro `400 Bad Request` ao criar venda ("CPF nao cadastrado")
+
+O CPF informado na venda deve estar previamente cadastrado em `/api/customers`. Execute o Passo 3 do Fluxo Completo antes de tentar criar a venda.
+
+### Aplicacao nao conecta ao Keycloak (`OIDC server not available`)
+
+```bash
+# Verificar se o Keycloak esta acessivel
+curl -s http://localhost:8180/realms/vehicle-resale/.well-known/openid-configuration | jq .issuer
+
+# Se rodar a API fora do Docker Compose (modo dev), garantir que a URL do OIDC aponta para localhost:
+# Em application.properties: quarkus.oidc.auth-server-url=http://localhost:8180/realms/vehicle-resale
+```
+
+### Resetar todo o ambiente (dados e containers)
+
+```bash
+# Para e remove containers + volumes (apaga todos os dados)
+docker-compose down -v
+
+# Sobe novamente do zero
+docker-compose up -d
+```
 
 ## Seguranca
 
-- Autenticacao via OAuth2/OIDC (Keycloak)
-- Tokens JWT para autorizacao
-- Senhas armazenadas em Secrets do Kubernetes
-- Aplicacao roda como usuario nao-root (UID 185)
-- Validacoes de entrada em todos os endpoints
+- Autenticacao via OAuth2/OIDC (Keycloak 23)
+- Tokens JWT para autorizacao (roles: `admin`, `buyer`)
+- Endpoints publicos: listagem de veiculos disponiveis/vendidos, health, swagger
+- Endpoints protegidos (autenticado): clientes, vendas
+- Endpoints restritos (role admin): criar/editar/excluir veiculos
+- Senhas armazenadas em Secrets do Kubernetes em producao
+- Aplicacao roda como usuario nao-root (UID 185) no container
+- Validacoes de entrada (Bean Validation) em todos os DTOs
+
+## Documentacao Adicional (Fase 5)
+
+| Documento | Descricao |
+|-----------|-----------|
+| `docs/ARQUITETURA_FASE5.md` | Desenho da arquitetura, servicos de nuvem (AWS) e decisoes arquiteturais |
+| `docs/RELATORIO_SEGURANCA_DADOS_FASE5.md` | Dados sensiveis, politicas de acesso, riscos e LGPD |
+| `docs/RELATORIO_SAGA_FASE5.md` | Tipo de SAGA utilizada (compensacao), justificativa e implementacao |
+| `docs/FASE_5_VALIDACAO_REQUISITOS.md` | Checklist completo de requisitos atendidos |
+| `docs/MCP_SETUP.md` | Configuracao dos perfis MCP para agentes SDLC |
+| `mcp-profiles/` | Perfis MCP especializados (Backend, Arquiteto, QA, DevOps) |
 
 ## Licenca
 
 Projeto desenvolvido para fins educacionais - FIAP Pos-Tech Arquitetura de Software.
-# fase_3_distribuicao_da_aplicacao_FIAP
