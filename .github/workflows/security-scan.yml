@@ -47,7 +47,7 @@ jobs:
             --enableExperimental
 
       - name: Upload Dependency-Check results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-check-report
           path: reports/
@@ -188,7 +188,7 @@ jobs:
           ./mvnw license:aggregate-add-third-party -B
 
       - name: Upload license report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: license-report
           path: target/generated-sources/license/
