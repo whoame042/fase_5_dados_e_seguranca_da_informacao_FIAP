@@ -131,7 +131,7 @@ jobs:
         run: ./mvnw jacoco:report jacoco:check -B
 
       - name: Comment PR with coverage
-        uses: madrapps/jacoco-report@v1.6.1
+        uses: madrapps/jacoco-report@v1.7.2
         if: github.event_name == 'pull_request'
         with:
           paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
